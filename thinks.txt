@@ -1,0 +1,137 @@
+при старте vim запомнить содержимое tags, path
+типа 
+let s:tags_default = &tags
+let s:path_default = &path
+    
+а также всякие 
+g:proj_project_filename, g:indexer_indexerListFilename, и т.д.
+или просто ниче этого не запоминать (только tags и path, 
+т.к. они меняются в indexer), а потом в BufEnter сорсить vimrc
+
+
+есть dictionary dProjFilesParsed,
+   ключами которого являются строки вида "path_to__vimprojects"
+   TODO захешировать
+
+   каждый его элемент имеет ключи-проекты вида
+      projName, и это - dictionary dProjectsParsed
+--------------------------------
+все теги лежат в одном месте, файлы тегов называются так же, какому
+назвается проект: path_to__vimprojects_projName
+
+есть dictionary dVimprjRoots
+   ключами которого являются строки вида
+   path_to_vimprj_dir
+   и одна, по умолчанию: "default"
+--------------------------------
+
+каждый проект (элемент dProjectsParsed) имеет значения:
+- все те, что сейчас имеет dParseGlobal
+- boolIndexed - признак того, что теги уже были сгенерены для этого проекта
+- строку path ( потом будет прямо добавлена в &path )
+- tagsFilename - полное (с путем) имя файла тегов
+
+каждый project_root (элемент dVimprjRoots) имеет значения:
+-  все опции g:indexer_.. ! кроме нескольких
+-  mode - строка, "IndexerFile", "ProjectFile", ""
+-  proj_root - $INDEXER_PROJECT_ROOT
+-  path - то же, что proj_root, но еще добавлен "/.vimprj"
+
+---------------------
+список новых переменных:
+s:dVimprjRoots
+s:dProjFilesParsed
+s:curFileNum - номер текущего файла %
+s:dFiles - словарь с файлами
+
+----------------------
+список переменных:
+
+s:dParseGlobal
+s:sMode 
+      должен быть элементом проекта
+s:indexer_projectName - надо убрать
+      и сделать список с названиями проектов
+      но пока вот это один проект.
+      должен быть элементом dVimprjRoots
+      
+s:tagsDirname - директория, в которой лежит файл тегов.
+                один раз инициализирована ( из опции g:indexer_tagsDirname )
+                и все, потом меняться не будет
+                не должен быть ничьим элементом
+
+
+s:lPathsRoot - наверное будет убрано
+s:lPathsForCtags - наверное будет убрано
+
+s:boolIndexingModeOn - будет убрано
+
+----------------------
+
+
+есть dictionary с открытыми проектами:
+   [one_proj]
+      
+   [twp_pwoj]
+
+у каждого открытого файла (dFiles) есть след. параметры:
+    
+    vimprjRootsKey - ключ dVimprjRoots (по умолчанию default)
+    projects - список пар ключей dProjFilesParsed:
+         path_to__vimprojects, projName
+
+----------------------------------------------
+Инициализация indexer:
+   добавляем ключ "default" в dVimprjRoots
+   пишем в него все опции g:indexer_.. ! кроме tagsDirname
+
+BufReadPost:
+    ищем .vimprj, если найдем, то:
+        смотрим, есть ли уже такой ключ в dVimprjRoots
+        если нет - 
+            добавляем.
+            пишем в него все опции g:indexer_.. ! кроме tagsDirname
+
+        vimprjRootsKey = ключ dVimprjRoots
+    else    
+        vimprjRootsKey = "default"
+    endif
+
+    выясняем, какой файл проекта нужно юзать
+    смотрим: еще не парсили этот файл? (dProjFilesParsed)
+        парсим
+        добавляем его в autocmd BufWritePost
+    endif
+   
+    проходимся по всем проектам из данного файла проектов,
+    выясняем, к каким проектам принадлежит открытый файл
+
+    пишем соотв. ключи в projects для открытого файла (элемент dFiles)
+
+    полностью генерим теги для проектов, которые еще не были проиндексированы
+
+
+BufEnter:
+    поменять $INDEXER_PROJECT_ROOT
+    записать s:curFileNum
+    записать s:curVimprjKey
+    //  если новый и старый s:curFileNum отличаются, то:
+    сбросить на дефолтные path, tags
+    заполнить g:indexer_... дефолтными значениями
+    source vimrc
+    если есть .vimprj, то source
+    прибавить теги из тегов всех проектов,
+    прибавить path из тегов всех проектов
+
+BufWritePost:
+   для каждого проекта, который есть в текущем файле,
+   for l:i in s:dFiles[ s:curFileNum ].projects
+      s:dFiles[ s:curFileNum ].projects[l:i]
+      ....
+      обновляем теги
+
+
+Во всем модуле indexer!!
+    вместо g:indexer_.. надо использовать s:dVimprjRoots[ s:dFiles[ s:curFileNum ].vimprjRootsKey ]. .....
+
+
