@@ -272,24 +272,24 @@ endfunction
 
 " добавляет новый vimprj root, заполняет его текущими параметрами
 function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
-   let g:indexer_useDirsInsteadOfFiles = g:indexer_ctagsDontSpecifyFilesIfPossible
 
    if (!exists("s:dVimprjRoots['".a:sKey."']"))
       let s:dVimprjRoots[a:sKey] = {}
       let s:dVimprjRoots[a:sKey]["cd_path"] = a:sCdPath
       let s:dVimprjRoots[a:sKey]["proj_root"] = a:sPath
       if (!empty(a:sPath))
-         let s:dVimprjRoots[a:sKey]["path"] = a:sPath.'/'.g:indexer_dirNameForSearch
+         let s:dVimprjRoots[a:sKey]["path"] = a:sPath.'/'.s:indexer_dirNameForSearch
       else
          let s:dVimprjRoots[a:sKey]["path"] = ""
       endif
+      let s:dVimprjRoots[a:sKey]["useSedWhenAppend"]              = g:indexer_useSedWhenAppend
       let s:dVimprjRoots[a:sKey]["indexerListFilename"]           = g:indexer_indexerListFilename
       let s:dVimprjRoots[a:sKey]["projectsSettingsFilename"]      = g:indexer_projectsSettingsFilename
       let s:dVimprjRoots[a:sKey]["projectName"]                   = g:indexer_projectName
       let s:dVimprjRoots[a:sKey]["enableWhenProjectDirFound"]     = g:indexer_enableWhenProjectDirFound
       let s:dVimprjRoots[a:sKey]["ctagsCommandLineOptions"]       = g:indexer_ctagsCommandLineOptions
       let s:dVimprjRoots[a:sKey]["ctagsJustAppendTagsAtFileSave"] = g:indexer_ctagsJustAppendTagsAtFileSave
-      let s:dVimprjRoots[a:sKey]["useDirsInsteadOfFiles"]         = g:indexer_useDirsInsteadOfFiles
+      let s:dVimprjRoots[a:sKey]["useDirsInsteadOfFiles"]         = g:indexer_ctagsDontSpecifyFilesIfPossible
       let s:dVimprjRoots[a:sKey]["mode"]                          = ""
 
    endif
@@ -297,13 +297,13 @@ endfunction
 
 
 function! <SID>SetDefaultIndexerOptions()
+   let g:indexer_useSedWhenAppend                = s:def_useSedWhenAppend
    let g:indexer_indexerListFilename             = s:def_indexerListFilename
    let g:indexer_projectsSettingsFilename        = s:def_projectsSettingsFilename
    let g:indexer_projectName                     = s:def_projectName
    let g:indexer_enableWhenProjectDirFound       = s:def_enableWhenProjectDirFound
    let g:indexer_ctagsCommandLineOptions         = s:def_ctagsCommandLineOptions
    let g:indexer_ctagsJustAppendTagsAtFileSave   = s:def_ctagsJustAppendTagsAtFileSave
-   let g:indexer_useDirsInsteadOfFiles           = s:def_useDirsInsteadOfFiles
    let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
 endfunction
 
@@ -418,7 +418,7 @@ function! <SID>IndexerInfo()
    else
       echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
    endif
-   echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (g:indexer_useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
+   echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
    echo '* Projects indexed: '.l:sProjects
    if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
       echo "* Files indexed: there's ".l:iFilesCnt.' files.' 
@@ -432,7 +432,7 @@ function! <SID>IndexerInfo()
 
    echo '* Paths (with all subfolders): '.&path
    echo '* Tags file: '.&tags
-   echo '* Project root: '.($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found').'  (Project root is a directory which contains "'.g:indexer_dirNameForSearch.'" directory)'
+   echo '* Project root: '.($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found').'  (Project root is a directory which contains "'.s:indexer_dirNameForSearch.'" directory)'
 endfunction
 
 
@@ -470,7 +470,7 @@ function! <SID>GetCtagsCommand(dParams)
    " TODO: very need to make sed work with sorted files too, because of 
    "       Vim works much longer with unsorted file.
    "
-   if (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave && g:indexer_useSedWhenAppend)
+   if (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave && s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend)
       let l:sSortCode = '--sort=no'
    else
       let l:sSortCode = '--sort=yes'
@@ -494,7 +494,7 @@ endfunction
 
 
 " builds list of files (or dirs) and executes Ctags.
-" If list is too long (if command is more that g:indexer_maxOSCommandLen)
+" If list is too long (if command is more that s:indexer_maxOSCommandLen)
 " then executes ctags several times.
 " params:
 "   dParams {
@@ -516,7 +516,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
       let l:sCurFile = <SID>ParsePath(l:sCurFile)
       " if command with next file will be too long, then executing command
       " BEFORE than appending next file to list
-      if ((strlen(l:sFiles) + strlen(l:sCurFile) + l:iCmdLen) > g:indexer_maxOSCommandLen)
+      if ((strlen(l:sFiles) + strlen(l:sCurFile) + l:iCmdLen) > s:indexer_maxOSCommandLen)
          call <SID>ExecCtags({'append': 1, 'recursive': a:dParams.recursive, 'sTagsFile': a:dParams.sTagsFile, 'sFiles': l:sFiles})
          let l:sFiles = ''
       endif
@@ -576,7 +576,7 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
    if (!empty(a:sSavedFile) && filereadable(l:sTagsFile))
       " just appending tags from just saved file. (from one file!)
-      if (g:indexer_useSedWhenAppend)
+      if (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend)
          call <SID>ExecSed({'sTagsFile': l:sTagsFile, 'sFilenameToDeleteTagsWith': a:sSavedFile})
       endif
       call <SID>ExecCtags({'append': 1, 'recursive': 0, 'sTagsFile': l:sTagsFile, 'sFiles': a:sSavedFile})
@@ -1072,14 +1072,14 @@ function! <SID>OnNewFileOpened()
 
    " ищем .vimprj
    let l:sVimprjKey = "default"
-   if g:indexer_lookForProjectDir
+   if s:indexer_lookForProjectDir
       " need to look for .vimprj directory
 
       let l:i = 0
       let l:sCurPath = ''
       let $INDEXER_PROJECT_ROOT = ''
-      while (l:i < g:indexer_recurseUpCount)
-         if (isdirectory(expand('%:p:h').l:sCurPath.'/'.g:indexer_dirNameForSearch))
+      while (l:i < s:indexer_recurseUpCount)
+         if (isdirectory(expand('%:p:h').l:sCurPath.'/'.s:indexer_dirNameForSearch))
             let $INDEXER_PROJECT_ROOT = simplify(expand('%:p:h').l:sCurPath)
             exec 'cd '.substitute($INDEXER_PROJECT_ROOT, ' ', '\\ ', 'g')
             break
@@ -1092,16 +1092,15 @@ function! <SID>OnNewFileOpened()
          " project root was found.
          "
          " set directory for tags in .vimprj dir
-         " let s:tagsDirname = $INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch.'/tags'
+         " let s:tagsDirname = $INDEXER_PROJECT_ROOT.'/'.s:indexer_dirNameForSearch.'/tags'
 
          " сбросить все g:indexer_.. на дефолтные
          call <SID>SetDefaultIndexerOptions()
 
-         let g:indexer_useDirsInsteadOfFiles = g:indexer_ctagsDontSpecifyFilesIfPossible
 
 
          " sourcing all *vim files in .vimprj dir
-         let l:lSourceFilesList = split(glob($INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch.'/*vim'), '\n')
+         let l:lSourceFilesList = split(glob($INDEXER_PROJECT_ROOT.'/'.s:indexer_dirNameForSearch.'/*vim'), '\n')
          let l:sThisFile = expand('%:p')
          for l:sFile in l:lSourceFilesList
             exec 'source '.l:sFile
@@ -1112,7 +1111,7 @@ function! <SID>OnNewFileOpened()
          "exec 'cd '.substitute($INDEXER_PROJECT_ROOT, ' ', '\\ ', 'g')
 
          " проверяем, не открыли ли мы файл из директории .vimprj
-         let l:sPathToDirNameForSearch = $INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch
+         let l:sPathToDirNameForSearch = $INDEXER_PROJECT_ROOT.'/'.s:indexer_dirNameForSearch
          let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
 
          if (strpart(expand('%:p:h'), 0, l:iPathToDNFSlen) != l:sPathToDirNameForSearch)
@@ -1181,7 +1180,7 @@ function! <SID>OnNewFileOpened()
       "    
       " есть опция: g:indexer_enableWhenProjectDirFound, она прямо указывает,
       "             нужно ли включать любой файл из поддиректории, или нет.
-      "             Но еще есть опция g:indexer_useDirsInsteadOfFiles, и если
+      "             Но еще есть опция g:indexer_ctagsDontSpecifyFilesIfPossible, и если
       "             она установлена, то плагин вообще не знает ничего про 
       "             конкретные файлы, поэтому мы должны себя вести также, какой
       "             если установлена первая опция.
@@ -1323,42 +1322,51 @@ endfunction
 
 " --------- init variables --------
 if !exists('g:indexer_lookForProjectDir')
-   let g:indexer_lookForProjectDir = 1
+   let s:indexer_lookForProjectDir = 1
+else
+   let s:indexer_lookForProjectDir = g:indexer_lookForProjectDir
 endif
 
 if !exists('g:indexer_dirNameForSearch')
-   let g:indexer_dirNameForSearch = '.vimprj'
+   let s:indexer_dirNameForSearch = '.vimprj'
+else
+   let s:indexer_dirNameForSearch = g:indexer_dirNameForSearch
 endif
 
 if !exists('g:indexer_recurseUpCount')
-   let g:indexer_recurseUpCount = 10
+   let s:indexer_recurseUpCount = 10
+else
+   let s:indexer_recurseUpCount = g:indexer_recurseUpCount
 endif
 
 if !exists('g:indexer_tagsDirname')
-   let g:indexer_tagsDirname = ''  "$HOME.'/.vimtags'
+   let s:indexer_tagsDirname = ''  "$HOME.'/.vimtags'
+else
+   let s:indexer_tagsDirname = g:indexer_tagsDirname
 endif
 
 if !exists('g:indexer_maxOSCommandLen')
    if (has('win32') || has('win64'))
-      let g:indexer_maxOSCommandLen = 8000
+      let s:indexer_maxOSCommandLen = 8000
    else
-      let g:indexer_maxOSCommandLen = system("echo $(( $(getconf ARG_MAX) - $(env | wc -c) ))") - 200
+      let s:indexer_maxOSCommandLen = system("echo $(( $(getconf ARG_MAX) - $(env | wc -c) ))") - 200
    endif
+else
+   let s:indexer_maxOSCommandLen = g:indexer_maxOSCommandLen
 endif
+
+
+
+
+
 
 if !exists('g:indexer_useSedWhenAppend')
    let g:indexer_useSedWhenAppend = 1
 endif
 
-
-
-
-
-
 if !exists('g:indexer_indexerListFilename')
    let g:indexer_indexerListFilename = $HOME.'/.indexer_files'
 endif
-
 
 if !exists('g:indexer_projectsSettingsFilename')
    let g:indexer_projectsSettingsFilename = $HOME.'/.vimprojects'
@@ -1388,15 +1396,14 @@ if !exists('g:indexer_defaultSettingsFilename')
     let g:indexer_defaultSettingsFilename = ''
 endif
 
-let g:indexer_useDirsInsteadOfFiles = g:indexer_ctagsDontSpecifyFilesIfPossible
 
+let s:def_useSedWhenAppend                = g:indexer_useSedWhenAppend
 let s:def_indexerListFilename             = g:indexer_indexerListFilename
 let s:def_projectsSettingsFilename        = g:indexer_projectsSettingsFilename
 let s:def_projectName                     = g:indexer_projectName
 let s:def_enableWhenProjectDirFound       = g:indexer_enableWhenProjectDirFound
 let s:def_ctagsCommandLineOptions         = g:indexer_ctagsCommandLineOptions
 let s:def_ctagsJustAppendTagsAtFileSave   = g:indexer_ctagsJustAppendTagsAtFileSave
-let s:def_useDirsInsteadOfFiles           = g:indexer_useDirsInsteadOfFiles
 let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPossible
 
 " -------- init commands ---------
@@ -1444,7 +1451,4 @@ augroup END
 autocmd BufEnter * call <SID>OnBufEnter()
 
 autocmd BufWritePost * call <SID>OnBufSave()
-
-" запоминаем tagsDirname
-let s:indexer_tagsDirname = g:indexer_tagsDirname
 
