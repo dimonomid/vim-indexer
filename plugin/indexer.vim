@@ -17,9 +17,6 @@
 "
 " Перезагрузка проектов при сохранении файлов .vimprojects или .indexer_files
 "
-" Выяснить, почему если открыть .vimprj/my.vim, а потом открыть файл из проекта,
-" то ничего не индексируется
-"
 " ----------------
 "
 " *) !!! Unsorted tags file is BAD. Please try to make SED work with sorted
@@ -87,6 +84,8 @@
 "                                   ASYNC COMMAND FUNCTIONS
 " ************************************************************************************************
 
+" ------------------ next 2 functions is directly from asynccommand.vim ---------------------
+
 " Basic background task running is different on each platform
 if has("win32")
    " Works in Windows (Win7 x64)
@@ -126,6 +125,62 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
    endif
 
    call <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
+endfunction
+
+" ---------------------- my async level ----------------------
+
+function! <SID>AddNewAsyncTask(dParams)
+   "call add(s:lAsyncTasks, a:dParams)
+   let s:dAsyncTasks[ s:iAsyncTaskLast ] = a:dParams
+   let s:iAsyncTaskLast += 1
+   if !s:boolAsyncCommandInProgress
+      call <SID>_ExecNextAsyncTask()
+   endif
+
+endfunction
+
+function! <SID>_ExecNextAsyncTask()
+
+   "echo s:dAsyncTasks
+   if !s:boolAsyncCommandInProgress && s:iAsyncTaskNext < s:iAsyncTaskLast
+      let s:boolAsyncCommandInProgress = 1
+      let l:dParams = s:dAsyncTasks[ s:iAsyncTaskNext ]
+      unlet s:dAsyncTasks[ s:iAsyncTaskNext ]
+      let s:iAsyncTaskNext += 1
+
+      if l:dParams["mode"] == "AsyncModeCtags"
+
+         let l:sCmd = <SID>GetCtagsCommand(l:dParams["data"])
+         call <SID>IndexerAsyncCommand(l:sCmd, "Indexer_OnAsyncCommandComplete")
+
+      elseif l:dParams["mode"] == "AsyncModeSed"
+
+         call <SID>IndexerAsyncCommand(l:dParams["data"]["sSedCmd"], "Indexer_OnAsyncCommandComplete")
+
+      elseif l:dParams["mode"] == "AsyncModeDelete"
+
+         if filereadable(l:dParams["data"]["filename"])
+            call delete(l:dParams["data"]["filename"])
+         endif
+
+         " we should make dummy async call
+         call <SID>IndexerAsyncCommand("ctags --version", "Indexer_OnAsyncCommandComplete")
+
+      endif
+   endif
+
+endfunction
+
+function! Indexer_OnAsyncCommandComplete(temp_file_name)
+
+   let s:boolAsyncCommandInProgress = 0
+
+   "exec "split " . a:temp_file_name
+   "wincmd w
+   "redraw
+
+   call <SID>_ExecNextAsyncTask()
+
 endfunction
 
 
@@ -420,17 +475,9 @@ function! <SID>GetCtagsCommand(dParams)
    return l:sCmd
 endfunction
 
-" executes ctags called with specified params.
-" params look in comments to <SID>GetCtagsCommand()
 function! <SID>ExecCtags(dParams)
-   let l:sCmd = <SID>GetCtagsCommand(a:dParams)
-
-   call <SID>IndexerAsyncCommand(l:sCmd, "")
-   "if exists("*AsyncCommand")
-      "call AsyncCommand(l:sCmd, "")
-   "else
-      "let l:resp = system(l:sCmd)
-   "endif
+   let l:dAsyncParams = {'mode' : 'AsyncModeCtags' , 'data' : a:dParams}
+   call <SID>AddNewAsyncTask(l:dAsyncParams)
 endfunction
 
 
@@ -469,7 +516,9 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
       call <SID>ExecCtags({'append': 1, 'recursive': a:dParams.recursive, 'sTagsFile': a:dParams.sTagsFile, 'sFiles': l:sFiles})
    endif
 
+
 endfunction
+
 
 
 function! <SID>ExecSed(dParams)
@@ -482,7 +531,12 @@ function! <SID>ExecSed(dParams)
 
    let l:sCmd = "sed -e \"/".l:sFilenameToDeleteTagsWith."/d\" -i \"".a:dParams.sTagsFile."\""
 
-   let l:resp = system(l:sCmd)
+   let l:dAsyncParams = {'mode' : 'AsyncModeSed' , 'data' : {'sSedCmd' : l:sCmd}}
+   call <SID>AddNewAsyncTask(l:dAsyncParams)
+
+   "let l:resp = system(l:sCmd)
+
+
    "if exists("*AsyncCommand")
       "call AsyncCommand(l:sCmd, "")
    "else
@@ -514,13 +568,17 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
          call <SID>ExecSed({'sTagsFile': l:sTagsFile, 'sFilenameToDeleteTagsWith': a:sSavedFile})
       endif
       call <SID>ExecCtags({'append': 1, 'recursive': 0, 'sTagsFile': l:sTagsFile, 'sFiles': a:sSavedFile})
+
    else
       " need to rebuild all tags.
 
       " deleting old tagsfile
-      if (filereadable(l:sTagsFile))
-         call delete(l:sTagsFile)
-      endif
+      "if (filereadable(l:sTagsFile))
+         "call delete(l:sTagsFile)
+      "endif
+      "let l:dAsyncParams = {'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } }
+
+      call <SID>AddNewAsyncTask({'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } })
 
       " generating tags for files
       call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.files,          'sTagsFile': l:sTagsFile,  'recursive': 0})
@@ -1085,14 +1143,8 @@ function! <SID>OnNewFileOpened()
          " добавляем autocmd BufWritePost для файла с описанием проекта
 
          augroup Indexer_SavPrjFile
-            "if (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
-               "let l:sIdxFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
-               "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sIdxFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
-            "elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
-               "let l:sPrjFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
-               "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
-            "endif
-            let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], '^.*[\\/]\([^\\/]\+\)$', '\1', '')
+            "let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], '^.*[\\/]\([^\\/]\+\)$', '\1', '')
+            let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], ' ', '\\\\\\ ', 'g')
             exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
          augroup END
 
@@ -1335,7 +1387,12 @@ if exists(':IndexerRebuild') != 2
 endif
 
 
-
+" DICTIONARY for acync commands
+"let s:dAsyncData = {}
+let s:dAsyncTasks = {}
+let s:iAsyncTaskNext = 0
+let s:iAsyncTaskLast = 0
+let s:boolAsyncCommandInProgress = 0
 
 " запоминаем начальные &tags, &path
 let s:sTagsDefault = &tags
