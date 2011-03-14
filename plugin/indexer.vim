@@ -879,8 +879,20 @@ function! <SID>OnNewFileOpened()
             exec 'source '.l:sFile
          endfor
 
-         let l:sVimprjKey = <SID>GetKeyFromPath($INDEXER_PROJECT_ROOT)
-         call <SID>AddNewVimprjRoot(l:sVimprjKey, $INDEXER_PROJECT_ROOT, $INDEXER_PROJECT_ROOT)
+         let l:sNewVimprjKey = <SID>GetKeyFromPath($INDEXER_PROJECT_ROOT)
+         call <SID>AddNewVimprjRoot(l:sNewVimprjKey, $INDEXER_PROJECT_ROOT, $INDEXER_PROJECT_ROOT)
+         "exec 'cd '.substitute($INDEXER_PROJECT_ROOT, ' ', '\\ ', 'g')
+
+         " проверяем, не открыли ли мы файл из директории .vimprj
+         let l:sPathToDirNameForSearch = $INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch
+         let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
+
+         if (strpart(expand('%:p:h'), 0, l:iPathToDNFSlen) != l:sPathToDirNameForSearch)
+            " нет, открытый файл - не из директории .vimprj, так что применяем
+            " для него настройки из этой директории .vimprj
+            let l:sVimprjKey = l:sNewVimprjKey
+         endif
+         
 
       endif
 
