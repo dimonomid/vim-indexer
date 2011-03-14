@@ -475,6 +475,8 @@ function! <SID>GetCtagsCommand(dParams)
    return l:sCmd
 endfunction
 
+" executes ctags called with specified params.
+" params look in comments to <SID>GetCtagsCommand()
 function! <SID>ExecCtags(dParams)
    let l:dAsyncParams = {'mode' : 'AsyncModeCtags' , 'data' : a:dParams}
    call <SID>AddNewAsyncTask(l:dAsyncParams)
