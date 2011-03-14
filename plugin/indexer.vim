@@ -38,8 +38,48 @@
 " *) maybe checking whether or not sed is correctly parsing ( \\\\ or \\ )
 "
 
+
+
+"
+" s:dProjFilesParsed - dictionary with info about files ".vimprojects" and/or ".indexer_files"
+"     [  <path_to__indexer_files_or__vimprojects>  ] - DICTIONARY
+"        ["projects"]
+"           [  <project_name>  ] - DICTIONARY
+"              ["pathsRoot"]
+"              ["pathsForCtags"]
+"              ["not_exist"]
+"              ["files"]
+"        ["filename"] = (for example) "/home/user/.indexer_files"
+"
+"
+" s:dVimprjRoots - dictionary with info about $INDEXER_PROJECT_ROOTs
+"     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY
+"        ["cd_path"] - path for CD. Can't be empty.
+"        ["proj_root"] - $INDEXER_PROJECT_ROOT. Can be empty (for "default")
+"        ["path"] - path to .vimprj dir. Actually, this is
+"                   "proj_root"."/.vimprj", if "proj_root" isn't empty.
+"        ["mode"] - "IndexerFile" or "ProjectFile"
+"        ..... - many indexer options like "indexerListFilename", etc.
+"
+"
+" s:dFiles - dictionary with info about all regular files
+"     [  <bufnr('%')>  ] - DICTIONARY
+"        ["sVimprjKey"] - key for s:dVimprjRoots
+"        ["projects"] - LIST 
+"                             NOTE!!!
+"                             At this moment only ONE project
+"                             is allowed for each file
+"           [0, 1, 2, ...] - at this moment, only 0 is available
+"              ["file"] - key for s:dProjFilesParsed
+"              ["name"] - name of project
+"           
+"        
+"  
+"
+
+
 " ************************************************************************************************
-"                                   ADDITIONAL FUNCTIONS
+"                                   ASYNC COMMAND FUNCTIONS
 " ************************************************************************************************
 
 " Basic background task running is different on each platform
@@ -84,6 +124,13 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
 endfunction
 
 
+" ************************************************************************************************
+"                                   ADDITIONAL FUNCTIONS
+" ************************************************************************************************
+
+
+" returns if we should to skip this buffer ('skip' means not to generate tags
+" for it)
 function! <SID>NeedSkipBuffer(buf)
    if !empty(getbufvar(a:buf, "&buftype"))
       return 1
@@ -100,6 +147,7 @@ function! <SID>NeedSkipBuffer(buf)
    return 0
 endfunction
 
+" returns if buffer is changed (swithed) to another, or not
 function! <SID>IsBufChanged()
     return (s:curFileNum != bufnr('%'))
 endfunction
@@ -140,7 +188,7 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
          let s:dVimprjRoots[a:sKey]["path"] = ""
       endif
       let s:dVimprjRoots[a:sKey]["indexerListFilename"]           = g:indexer_indexerListFilename
-      let s:dVimprjRoots[a:sKey]["projectsSettingsFilename"]       = g:indexer_projectsSettingsFilename
+      let s:dVimprjRoots[a:sKey]["projectsSettingsFilename"]      = g:indexer_projectsSettingsFilename
       let s:dVimprjRoots[a:sKey]["projectName"]                   = g:indexer_projectName
       let s:dVimprjRoots[a:sKey]["enableWhenProjectDirFound"]     = g:indexer_enableWhenProjectDirFound
       let s:dVimprjRoots[a:sKey]["ctagsCommandLineOptions"]       = g:indexer_ctagsCommandLineOptions
@@ -752,7 +800,7 @@ endfunction
 
 
 " ************************************************************************************************
-"                                       MAIN FUNCTIONS
+"                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnNewFileOpened)
 " ************************************************************************************************
 
 function! <SID>OnBufSave()
@@ -1262,8 +1310,4 @@ autocmd BufWritePost * call <SID>OnBufSave()
 
 " запоминаем tagsDirname
 let s:indexer_tagsDirname = g:indexer_tagsDirname
-
-" TODO: удалить
-let s:boolIndexingModeOn = 0
-
 
