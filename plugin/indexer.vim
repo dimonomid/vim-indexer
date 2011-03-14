@@ -196,9 +196,6 @@ function! <SID>ApplyVimprjSettings(sVimprjKey)
    let &tags = s:sTagsDefault
    let &path = s:sPathDefault
 
-   "" TODO: сбросить все g:indexer_.. на дефолтные
-   "source $MYVIMRC
-
    if (!empty(g:indexer_defaultSettingsFilename))
       exec 'source '.g:indexer_defaultSettingsFilename
    endif
@@ -297,6 +294,19 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
 
    endif
 endfunction
+
+
+function! <SID>SetDefaultIndexerOptions()
+   let g:indexer_indexerListFilename             = s:def_indexerListFilename
+   let g:indexer_projectsSettingsFilename        = s:def_projectsSettingsFilename
+   let g:indexer_projectName                     = s:def_projectName
+   let g:indexer_enableWhenProjectDirFound       = s:def_enableWhenProjectDirFound
+   let g:indexer_ctagsCommandLineOptions         = s:def_ctagsCommandLineOptions
+   let g:indexer_ctagsJustAppendTagsAtFileSave   = s:def_ctagsJustAppendTagsAtFileSave
+   let g:indexer_useDirsInsteadOfFiles           = s:def_useDirsInsteadOfFiles
+   let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
+endfunction
+
 
 function! <SID>IndexerFilesList()
    echo "* Files indexed: ".join(s:dParseGlobal.files, ', ')
@@ -1084,6 +1094,11 @@ function! <SID>OnNewFileOpened()
          " set directory for tags in .vimprj dir
          " let s:tagsDirname = $INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch.'/tags'
 
+         " сбросить все g:indexer_.. на дефолтные
+         call <SID>SetDefaultIndexerOptions()
+
+         let g:indexer_useDirsInsteadOfFiles = g:indexer_ctagsDontSpecifyFilesIfPossible
+
 
          " sourcing all *vim files in .vimprj dir
          let l:lSourceFilesList = split(glob($INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch.'/*vim'), '\n')
@@ -1375,6 +1390,14 @@ endif
 
 let g:indexer_useDirsInsteadOfFiles = g:indexer_ctagsDontSpecifyFilesIfPossible
 
+let s:def_indexerListFilename             = g:indexer_indexerListFilename
+let s:def_projectsSettingsFilename        = g:indexer_projectsSettingsFilename
+let s:def_projectName                     = g:indexer_projectName
+let s:def_enableWhenProjectDirFound       = g:indexer_enableWhenProjectDirFound
+let s:def_ctagsCommandLineOptions         = g:indexer_ctagsCommandLineOptions
+let s:def_ctagsJustAppendTagsAtFileSave   = g:indexer_ctagsJustAppendTagsAtFileSave
+let s:def_useDirsInsteadOfFiles           = g:indexer_useDirsInsteadOfFiles
+let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPossible
 
 " -------- init commands ---------
 
