@@ -966,9 +966,6 @@ function! <SID>OnBufEnter()
    "" TODO: сбросить все g:indexer_.. на дефолтные
    "source $MYVIMRC
 
-   " TODO: сорсить маленький, типа дефолтный vimrc с настройками вроде
-   " makeprg, ts, sw
-
    "let l:sTmp = &ts
    if (!empty(g:indexer_defaultSettingsFilename))
        exec 'source '.g:indexer_defaultSettingsFilename
@@ -984,10 +981,7 @@ function! <SID>OnBufEnter()
       let l:lSourceFilesList = split(glob(s:dVimprjRoots[ s:curVimprjKey ]["path"].'/*vim'), '\n')
       let l:sThisFile = expand('%:p')
       for l:sFile in l:lSourceFilesList
-         if (l:sFile != l:sThisFile)
-            exec 'source '.l:sFile
-            "let l:sTmp .= "==file(".l:sFile.")"
-         endif
+         exec 'source '.l:sFile
       endfor
 
    endif
@@ -1048,9 +1042,7 @@ function! <SID>OnNewFileOpened()
          let l:lSourceFilesList = split(glob($INDEXER_PROJECT_ROOT.'/'.g:indexer_dirNameForSearch.'/*vim'), '\n')
          let l:sThisFile = expand('%:p')
          for l:sFile in l:lSourceFilesList
-            if (l:sFile != l:sThisFile)
-               exec 'source '.l:sFile
-            endif
+            exec 'source '.l:sFile
          endfor
 
          let l:sVimprjKey = <SID>GetKeyFromPath($INDEXER_PROJECT_ROOT)
