@@ -40,20 +40,25 @@
 
 
 
+" --------- MAIN INDEXER VARIABLES ---------
 "
-" s:dProjFilesParsed - dictionary with info about files ".vimprojects" and/or ".indexer_files"
-"     [  <path_to__indexer_files_or__vimprojects>  ] - DICTIONARY
-"        ["projects"]
-"           [  <project_name>  ] - DICTIONARY
+" s:dProjFilesParsed - DICTIONARY with info about files ".vimprojects" and/or ".indexer_files"
+"     [  <path_to__indexer_files_or__vimprojects>  ] - DICTIONARY KEY, example of key:
+"                                                      "_home_user__indexer_files"
+"        ["projects"] - DICTIONARY
+"           [  <project_name>  ] - DICTIONARY KEY
 "              ["pathsRoot"]
 "              ["pathsForCtags"]
 "              ["not_exist"]
 "              ["files"]
+"              ["paths"]
 "        ["filename"] = (for example) "/home/user/.indexer_files"
+"        ["type"] - "IndexerFile" or "ProjectFile"
+"        ["sVimprjKey"] - key for s:dVimprjRoots
 "
 "
-" s:dVimprjRoots - dictionary with info about $INDEXER_PROJECT_ROOTs
-"     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY
+" s:dVimprjRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
+"     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY KEY
 "        ["cd_path"] - path for CD. Can't be empty.
 "        ["proj_root"] - $INDEXER_PROJECT_ROOT. Can be empty (for "default")
 "        ["path"] - path to .vimprj dir. Actually, this is
@@ -62,14 +67,14 @@
 "        ..... - many indexer options like "indexerListFilename", etc.
 "
 "
-" s:dFiles - dictionary with info about all regular files
-"     [  <bufnr('%')>  ] - DICTIONARY
+" s:dFiles - DICTIONARY with info about all regular files
+"     [  <bufnr('%')>  ] - DICTIONARY KEY
 "        ["sVimprjKey"] - key for s:dVimprjRoots
 "        ["projects"] - LIST 
 "                             NOTE!!!
 "                             At this moment only ONE project
 "                             is allowed for each file
-"           [0, 1, 2, ...] - at this moment, only 0 is available
+"           [0, 1, 2, ...] - LIST KEY. At this moment, only 0 is available
 "              ["file"] - key for s:dProjFilesParsed
 "              ["name"] - name of project
 "           
@@ -127,6 +132,45 @@ endfunction
 " ************************************************************************************************
 "                                   ADDITIONAL FUNCTIONS
 " ************************************************************************************************
+
+" applies all settings from .vimprj dir
+function! <SID>ApplyVimprjSettings(sVimprjKey)
+
+   let $INDEXER_PROJECT_ROOT = s:dVimprjRoots[ a:sVimprjKey ].proj_root
+
+   let &tags = s:sTagsDefault
+   let &path = s:sPathDefault
+
+   "" TODO: сбросить все g:indexer_.. на дефолтные
+   "source $MYVIMRC
+
+   if (!empty(g:indexer_defaultSettingsFilename))
+      exec 'source '.g:indexer_defaultSettingsFilename
+   endif
+
+   if (!empty(s:dVimprjRoots[ a:sVimprjKey ].path))
+      " sourcing all *vim files in .vimprj dir
+      let l:lSourceFilesList = split(glob(s:dVimprjRoots[ a:sVimprjKey ]["path"].'/*vim'), '\n')
+      let l:sThisFile = expand('%:p')
+      for l:sFile in l:lSourceFilesList
+         exec 'source '.l:sFile
+      endfor
+
+   endif
+
+   "let l:sTmp .= "===".&ts
+   "let l:tmp2 = input(l:sTmp)
+   " для каждого проекта, в который входит файл, добавляем tags и path
+
+   for l:lFileProjs in s:dFiles[ s:curFileNum ]["projects"]
+      exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
+      exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
+   endfor
+
+   " переключаем рабочую директорию
+   exec "cd ".s:dVimprjRoots[ a:sVimprjKey ]["cd_path"]
+
+endfunction
 
 
 " returns if we should to skip this buffer ('skip' means not to generate tags
@@ -451,7 +495,15 @@ endfunction
 "                                   CTAGS SPECIAL FUNCTIONS
 " ************************************************************************************************
 
-function! <SID>UpdateAllTagsForProject(sProjFileKey, sProjName, sSavedFile)
+" update tags for one project.
+" 
+" params:
+"     sProjFileKey - key for s:dProjFilesParsed
+"     sProjName - project name in this projects file
+"     sSavedFile - CAN BE EMPTY.
+"                  if empty, then updating ALL tags for given project.
+"                  otherwise, updating tags for just this file with Append.
+function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
    let l:sTagsFile = s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename
    let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ a:sProjName ]
@@ -484,10 +536,36 @@ function! <SID>UpdateAllTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
 endfunction
 
+" re-read projects from given file, 
+" update all tags for every project that is already indexed
+"
+function! <SID>UpdateTagsForEveryNeededProjectFromFile(sProjFileKey)
+
+   call <SID>ParseProjectSettingsFile(a:sProjFileKey)
+
+   " list of projects we should to index
+   let l:lProjects = []
+
+   " searching for all currently indexed projects from given projects file
+   " (we should to reindex they all)
+   for l:iBufNum in keys(s:dFiles)
+      for l:dProjectFile in s:dFiles[ l:iBufNum ]["projects"]
+         if (l:dProjectFile["file"] == a:sProjFileKey && index(l:lProjects, l:dProjectFile["name"]) == -1)
+            call add(l:lProjects, l:dProjectFile["name"])
+         endif
+      endfor
+   endfor
+
+
+   for l:sProject in l:lProjects
+      call <SID>UpdateTagsForProject(a:sProjFileKey, l:sProject, "")
+   endfor
+
+endfunction
 
 "function! <SID>UpdateAllTagsForAllProjectsFromFile(sProjFileKey)
    "for l:sCurProjName in keys(s:dProjFilesParsed[ a:sProjFileKey ])
-      "call UpdateAllTagsForProject(a:sProjFileKey, l:sCurProjName)
+      "call UpdateTagsForProject(a:sProjFileKey, l:sCurProjName)
    "endfor
 "endfunction
 
@@ -538,16 +616,16 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
       if l:sLine !~ '^\s*$' && l:sLine !~ '^\s*\#.*$'
 
          " look for project name [PrjName]
-         let myMatch = matchlist(l:sLine, '^\s*\[\([^\]]\+\)\]')
+         let l:myMatch = matchlist(l:sLine, '^\s*\[\([^\]]\+\)\]')
 
-         if (len(myMatch) > 0)
+         if (len(l:myMatch) > 0)
 
             " check for PROJECTS_PARENT section
 
-            if (strpart(myMatch[1], 0, 15) == 'PROJECTS_PARENT')
+            if (strpart(l:myMatch[1], 0, 15) == 'PROJECTS_PARENT')
                " this is projects parent section
                let l:sProjectsParentFilter = ''
-               let filterMatch = matchlist(myMatch[1], 'filter="\([^"]\+\)"')
+               let filterMatch = matchlist(l:myMatch[1], 'filter="\([^"]\+\)"')
                if (len(filterMatch) > 0)
                   let l:sProjectsParentFilter = filterMatch[1]
                endif
@@ -557,7 +635,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
 
 
                if (a:projectName != '')
-                  if (myMatch[1] == a:projectName)
+                  if (l:myMatch[1] == a:projectName)
                      let l:boolInNeededProject = 1
                   else
                      let l:boolInNeededProject = 0
@@ -565,7 +643,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
                endif
 
                if l:boolInNeededProject
-                  let l:sCurProjName = myMatch[1]
+                  let l:sCurProjName = l:myMatch[1]
                   let l:dResult[l:sCurProjName] = { 'files': [], 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
                endif
             endif
@@ -607,17 +685,18 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
                " like $BLABLABLA
                let l:sPatt = "\\v(\\$[a-zA-Z0-9_]+)"
                while (1)
-                  let varMatch = matchlist(l:sLine, l:sPatt)
+                  let l:varMatch = matchlist(l:sLine, l:sPatt)
                   " if there's any $BLABLA in string
-                  if (len(varMatch) > 0)
+                  if (len(l:varMatch) > 0)
                      " changing one slash in value to doubleslash
-                     let l:sTmp = substitute(expand(varMatch[1]), "\\\\", "\\\\\\\\", "g")
+                     let l:sTmp = substitute(expand(l:varMatch[1]), "\\\\", "\\\\\\\\", "g")
                      " changing $BLABLA to its value (doubleslashed)
                      let l:sLine = substitute(l:sLine, l:sPatt, l:sTmp, "")
                   else 
                      break
                   endif
                endwhile
+
 
                let l:sTmpLine = l:sLine
                " removing last part of path (removing all after last slash)
@@ -706,23 +785,23 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, projectName)
       endwhile
 
       " searching for blabla=qweqwe
-      let myMatch = matchlist(l:sLine, '\s*\(.\{-}\)=\(.\{-}\)\\\@<!\(\s\|$\)')
-      if (len(myMatch) > 0)
+      let l:myMatch = matchlist(l:sLine, '\s*\(.\{-}\)=\(.\{-}\)\\\@<!\(\s\|$\)')
+      if (len(l:myMatch) > 0)
          " now we found start of project folder or subfolder
          "
          if !l:boolInNeededProject
-            if (a:projectName != '' && myMatch[1] == a:projectName)
+            if (a:projectName != '' && l:myMatch[1] == a:projectName)
                let l:iOpenedBracesAtProjectStart = l:iOpenedBraces
                let l:boolInNeededProject = 1
             endif
          endif
 
          if l:boolInNeededProject && (l:iOpenedBraces == l:iOpenedBracesAtProjectStart)
-            let l:sCurProjName = myMatch[1]
-            let l:dResult[myMatch[1]] = { 'files': [], 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
+            let l:sCurProjName = l:myMatch[1]
+            let l:dResult[l:myMatch[1]] = { 'files': [], 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
          endif
 
-         let l:sLastFoundPath = myMatch[2]
+         let l:sLastFoundPath = l:myMatch[2]
          " ADDED! Jkooij
          " Strip the path of surrounding " characters, if there are any
          let l:sLastFoundPath = substitute(l:sLastFoundPath, "\"\\(.*\\)\"", "\\1", "g")
@@ -793,6 +872,69 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, projectName)
 endfunction
 
 
+function! <SID>ParseProjectSettingsFile(sProjFileKey)
+
+   let l:bufVimprjKey = s:curVimprjKey
+   let s:curVimprjKey = s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"]
+   call <SID>ApplyVimprjSettings(s:curVimprjKey)
+
+   if (s:dProjFilesParsed[ a:sProjFileKey ]["type"] == 'IndexerFile')
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromIndexerFile(s:dProjFilesParsed[ a:sProjFileKey ]["filename"], s:dVimprjRoots[ s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"] ].projectName)
+   elseif (s:dProjFilesParsed[ a:sProjFileKey ]["type"] == 'ProjectFile')
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromProjectFile(s:dProjFilesParsed[ a:sProjFileKey ]["filename"], s:dVimprjRoots[ s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"] ].projectName)
+   endif
+
+   let s:curVimprjKey = l:bufVimprjKey
+   call <SID>ApplyVimprjSettings(s:curVimprjKey)
+
+   " для каждого проекта из файла с описанием проектов
+   " указываем параметры:
+   "     boolIndexed = 0
+   "     tagsFilename - имя файла тегов
+   for l:sCurProjName in keys(s:dProjFilesParsed[ a:sProjFileKey ]["projects"])
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]["boolIndexed"] = 0
+
+      "let l:sTagsFileWOPath = <SID>GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
+      "let l:sTagsFile = s:tagsDirname.'/'.l:sTagsFileWOPath
+
+      " если директория для тегов не указана в конфиге - значит, юзаем
+      " /path/to/.vimprojects_tags/  (или ....indexer_files)
+      " и каждый файл называется так же, как называется проект.
+      "
+      " а если указана, то все теги кладем в нее, и названия файлов
+      " тегов будут длинными, типа: /path/to/tags/D__projects_myproject_vimprj__indexer_files_BK90
+
+      if empty(s:indexer_tagsDirname)
+         " директория для тегов НЕ указана
+         let l:sTagsDirname = s:dProjFilesParsed[a:sProjFileKey]["filename"]."_tags"
+         let l:sTagsFileWOPath = <SID>GetKeyFromPath(l:sCurProjName)
+      else
+         " директория для тегов указана
+         let l:sTagsDirname = s:indexer_tagsDirname
+         let l:sTagsFileWOPath = <SID>GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
+      endif
+
+      let l:sTagsFile = l:sTagsDirname.'/'.l:sTagsFileWOPath
+
+
+      if !isdirectory(l:sTagsDirname)
+         call mkdir(l:sTagsDirname, "p")
+      endif
+
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]["tagsFilename"] = l:sTagsFile
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]["tagsFilenameEscaped"]=substitute(l:sTagsFile, ' ', '\\\\\\ ', 'g')
+
+      let l:sPathsAll = ""
+      for l:sPath in s:dProjFilesParsed[a:sProjFileKey]["projects"][l:sCurProjName].paths
+         if isdirectory(l:sPath)
+            let l:sPathsAll .= substitute(l:sPath, ' ', '\\ ', 'g').","
+         endif
+      endfor
+      let s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]["sPathsAll"] = l:sPathsAll
+
+   endfor
+
+endfunction
 
 
 
@@ -819,14 +961,13 @@ function! <SID>OnBufSave()
       endif
 
       if g:indexer_ctagsJustAppendTagsAtFileSave
-         call <SID>UpdateAllTagsForProject(l:lFileProjs.file, l:lFileProjs.name, l:sSavedFile)
+         call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, l:sSavedFile)
       else
-         call <SID>UpdateAllTagsForProject(l:lFileProjs.file, l:lFileProjs.name, "")
+         call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, "")
       endif
 
    endfor
 endfunction
-
 
 function! <SID>OnBufEnter()
    if (<SID>NeedSkipBuffer('%'))
@@ -840,45 +981,9 @@ function! <SID>OnBufEnter()
    "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
 
    call <SID>SetCurrentFile()
-   let $INDEXER_PROJECT_ROOT = s:dVimprjRoots[ s:curVimprjKey ].proj_root
 
-   let &tags = s:sTagsDefault
-   let &path = s:sPathDefault
+   call <SID>ApplyVimprjSettings(s:curVimprjKey)
 
-   "" TODO: сбросить все g:indexer_.. на дефолтные
-   "source $MYVIMRC
-
-   "let l:sTmp = &ts
-   if (!empty(g:indexer_defaultSettingsFilename))
-       exec 'source '.g:indexer_defaultSettingsFilename
-   endif
-   "echo s:dVimprjRoots
-   "let l:sdfsdf = input("sdf")
-   "let l:sTmp .= "===".&ts
-   "let l:sTmp .= "==curVimprjKey(".s:curVimprjKey.")"
-   "let l:sTmp .= "==path(".s:dVimprjRoots[ s:curVimprjKey ]["path"].")"
-
-   if (!empty(s:dVimprjRoots[ s:curVimprjKey ].path))
-      " sourcing all *vim files in .vimprj dir
-      let l:lSourceFilesList = split(glob(s:dVimprjRoots[ s:curVimprjKey ]["path"].'/*vim'), '\n')
-      let l:sThisFile = expand('%:p')
-      for l:sFile in l:lSourceFilesList
-         exec 'source '.l:sFile
-      endfor
-
-   endif
-
-   "let l:sTmp .= "===".&ts
-   "let l:tmp2 = input(l:sTmp)
-   " для каждого проекта, в который входит файл, добавляем tags и path
-
-   for l:lFileProjs in s:dFiles[ s:curFileNum ]["projects"]
-      exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
-      exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
-   endfor
-
-   " переключаем рабочую директорию
-   exec "cd ".s:dVimprjRoots[ s:curVimprjKey ]["cd_path"]
 endfunction
 
 
@@ -973,71 +1078,23 @@ function! <SID>OnNewFileOpened()
    if (l:sProjFileKey != "") " если нашли файл с описанием проектов
       if (!exists("s:dProjFilesParsed['".l:sProjFileKey."']"))
          " если этот файл еще не обрабатывали
-         let s:dProjFilesParsed[ l:sProjFileKey ] = {"filename" : l:sProjFilename, "projects" : {} }
+         let s:dProjFilesParsed[ l:sProjFileKey ] = {"filename" : l:sProjFilename, "type" : s:dVimprjRoots[ s:curVimprjKey ].mode, "sVimprjKey" : s:curVimprjKey, "projects" : {} }
 
-         if (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromIndexerFile(s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename, s:dVimprjRoots[ s:curVimprjKey ].projectName)
-         elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromProjectFile(s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename, s:dVimprjRoots[ s:curVimprjKey ].projectName)
-         endif
+         call <SID>ParseProjectSettingsFile(l:sProjFileKey)
 
-         " для каждого проекта из файла с описанием проектов
-         " указываем параметры:
-         "     boolIndexed = 0
-         "     tagsFilename - имя файла тегов
-         for l:sCurProjName in keys(s:dProjFilesParsed[ l:sProjFileKey ]["projects"])
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"][ l:sCurProjName ]["boolIndexed"] = 0
+         " добавляем autocmd BufWritePost для файла с описанием проекта
 
-            "let l:sTagsFileWOPath = <SID>GetKeyFromPath(l:sProjFileKey.'_'.l:sCurProjName)
-            "let l:sTagsFile = s:tagsDirname.'/'.l:sTagsFileWOPath
-
-            " если директория для тегов не указана в конфиге - значит, юзаем
-            " /path/to/.vimprojects_tags/  (или ....indexer_files)
-            " и каждый файл называется так же, как называется проект.
-            "
-            " а если указана, то все теги кладем в нее, и названия файлов
-            " тегов будут длинными, типа: /path/to/tags/D__projects_myproject_vimprj__indexer_files_BK90
-
-            if empty(s:indexer_tagsDirname)
-               " директория для тегов НЕ указана
-               let l:sTagsDirname = s:dProjFilesParsed[l:sProjFileKey]["filename"]."_tags"
-               let l:sTagsFileWOPath = <SID>GetKeyFromPath(l:sCurProjName)
-            else
-               " директория для тегов указана
-               let l:sTagsDirname = s:indexer_tagsDirname
-               let l:sTagsFileWOPath = <SID>GetKeyFromPath(l:sProjFileKey.'_'.l:sCurProjName)
-            endif
-
-            let l:sTagsFile = l:sTagsDirname.'/'.l:sTagsFileWOPath
-
-
-            if !isdirectory(l:sTagsDirname)
-               call mkdir(l:sTagsDirname, "p")
-            endif
-
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"][ l:sCurProjName ]["tagsFilename"] = l:sTagsFile
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"][ l:sCurProjName ]["tagsFilenameEscaped"]=substitute(l:sTagsFile, ' ', '\\\\\\ ', 'g')
-
-            let l:sPathsAll = ""
-            for l:sPath in s:dProjFilesParsed[l:sProjFileKey]["projects"][l:sCurProjName].paths
-               if isdirectory(l:sPath)
-                  let l:sPathsAll .= substitute(l:sPath, ' ', '\\ ', 'g').","
-                  "exec 'set path+='.substitute(l:sPath, ' ', '\\ ', 'g')
-               endif
-            endfor
-            let s:dProjFilesParsed[l:sProjFileKey]["projects"][ l:sCurProjName ]["sPathsAll"] = l:sPathsAll
-
-         endfor
-
-         " TODO добавляем autocmd BufWritePost для файла с описанием проекта
-
-         if (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
-            let l:sIdxFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
-            "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sIdxFile.' call <SID>ParseProjectSettingsFile()'
-         elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
-            let l:sPrjFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
-            "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>ParseProjectSettingsFile()'
-         endif
+         augroup Indexer_SavPrjFile
+            "if (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
+               "let l:sIdxFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
+               "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sIdxFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
+            "elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
+               "let l:sPrjFile = substitute(s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename, '^.*[\\/]\([^\\/]\+\)$', '\1', '')
+               "exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
+            "endif
+            let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], '^.*[\\/]\([^\\/]\+\)$', '\1', '')
+            exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
+         augroup END
 
 
       endif
@@ -1148,7 +1205,7 @@ function! <SID>OnNewFileOpened()
       for l:sCurProj in s:dFiles[ s:curFileNum ].projects
          if (!s:dProjFilesParsed[ l:sCurProj.file ]["projects"][ l:sCurProj.name ].boolIndexed)
             " генерим теги
-            call <SID>UpdateAllTagsForProject(l:sCurProj.file, l:sCurProj.name, "")
+            call <SID>UpdateTagsForProject(l:sCurProj.file, l:sCurProj.name, "")
          endif
 
       endfor
@@ -1162,8 +1219,6 @@ function! <SID>OnNewFileOpened()
    " текущий номер буфера в 0
    let s:curFileNum = 0
 
-
-   "call <SID>ParseProjectSettingsFile()
 
 endfunction
 
