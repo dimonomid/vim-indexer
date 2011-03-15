@@ -1,8 +1,8 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Last Change: 11 Dec 2010
-" Version:     3.00 pre-beta
+" Last Change: 15 Mar 2011
+" Version:     3.00 beta
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
