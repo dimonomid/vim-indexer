@@ -166,6 +166,18 @@ function! <SID>_ExecNextAsyncTask()
          " we should make dummy async call
          call <SID>IndexerAsyncCommand("ctags --version", "Indexer_OnAsyncCommandComplete")
 
+      elseif l:dParams["mode"] == "AsyncModeRename"
+
+         if filereadable(l:dParams["data"]["filename_old"])
+            if filereadable(l:dParams["data"]["filename_new"])
+               call delete(l:dParams["data"]["filename_new"])
+            endif
+            call rename(l:dParams["data"]["filename_old"], l:dParams["data"]["filename_new"])
+         endif
+
+         " we should make dummy async call
+         call <SID>IndexerAsyncCommand("ctags --version", "Indexer_OnAsyncCommandComplete")
+
       endif
    endif
 
@@ -187,6 +199,14 @@ endfunction
 " ************************************************************************************************
 "                                   ADDITIONAL FUNCTIONS
 " ************************************************************************************************
+
+function! <SID>DeleteFile(filename)
+   call <SID>AddNewAsyncTask({'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : a:filename } })
+endfunction
+
+function! <SID>RenameFile(filename_old, filename_new)
+   call <SID>AddNewAsyncTask({'mode' : 'AsyncModeRename' , 'data' : { 'filename_old' : a:filename_old, 'filename_new' : a:filename_new } })
+endfunction
 
 " applies all settings from .vimprj dir
 function! <SID>ApplyVimprjSettings(sVimprjKey)
@@ -465,23 +485,26 @@ function! <SID>GetCtagsCommand(dParams)
    " when using append without Sed we SHOULD use sort, because of if there's no sort, then
    " symbols will be doubled.
    "
-   " when using append with Sed we SHOULD NOT use sort, because of if there's sort, then
+   " when using append with Sed on Windows (cygwin) we SHOULD NOT use sort, because of if there's sort, then
    " tags file becomes damaged, i can't figure out why.
    " TODO: very need to make sed work with sorted files too, because of 
    "       Vim works much longer with unsorted file.
    "
-   if (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave && s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend)
+   if (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave && s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend && (has('win32') || has('win64')))
       let l:sSortCode = '--sort=no'
    else
       let l:sSortCode = '--sort=yes'
    endif
 
    let l:sTagsFile = '"'.a:dParams.sTagsFile.'"'
-   if (has('win32') || has('win64'))
-      let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
-   else
-      let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles.' &'
-   endif
+   let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
+
+   "if (has('win32') || has('win64'))
+      "let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
+   "else
+      "let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles.' &'
+   "endif
+   "let wer = input(l:sCmd)
    return l:sCmd
 endfunction
 
@@ -537,14 +560,26 @@ function! <SID>ExecSed(dParams)
    " linux: all should work
    " windows: cygwin works, non-cygwin needs \\ instead of \\\\
    let l:sFilenameToDeleteTagsWith = a:dParams.sFilenameToDeleteTagsWith
+
    let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\\\", "\\\\\\\\\\\\\\\\", "g")
    let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\.", "\\\\\\\\.", "g")
    let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\/", "\\\\\\\\/", "g")
+
+   "let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\\\", "\\\\\\\\", "g")
+   "let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\.", "\\\\.", "g")
+   "let l:sFilenameToDeleteTagsWith = substitute(l:sFilenameToDeleteTagsWith, "\\/", "\\\\/", "g")
+
+   "let l:sCmd = "sed -e \"/".l:sFilenameToDeleteTagsWith."/d\" \"".a:dParams.sTagsFile."\" > \"".a:dParams.sTagsFile."_tmp\""
+   "let l:sCmd = "sed -e \"/iqqqqqqqqqq/d\" < \"".a:dParams.sTagsFile."\" > \"".a:dParams.sTagsFile."_tmp\""
+   "let df = input(l:sCmd)
+   "let l:sCmd = "sed -e \"/^.*\\s".l:sFilenameToDeleteTagsWith."\\s.*$/d\" -i \"".a:dParams.sTagsFile."\""
 
    let l:sCmd = "sed -e \"/".l:sFilenameToDeleteTagsWith."/d\" -i \"".a:dParams.sTagsFile."\""
 
    let l:dAsyncParams = {'mode' : 'AsyncModeSed' , 'data' : {'sSedCmd' : l:sCmd}}
    call <SID>AddNewAsyncTask(l:dAsyncParams)
+
+   "call <SID>RenameFile(a:dParams.sTagsFile."_tmp", a:dParams.sTagsFile)
 
    "let l:resp = system(l:sCmd)
 
@@ -590,12 +625,14 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
       "endif
       "let l:dAsyncParams = {'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } }
 
-      call <SID>AddNewAsyncTask({'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } })
+      call <SID>DeleteFile(l:sTagsFile."_tmp")
 
       " generating tags for files
-      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.files,          'sTagsFile': l:sTagsFile,  'recursive': 0})
+      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.files,          'sTagsFile': l:sTagsFile."_tmp",  'recursive': 0})
       " generating tags for directories
-      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.pathsForCtags,  'sTagsFile': l:sTagsFile,  'recursive': 1})
+      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.pathsForCtags,  'sTagsFile': l:sTagsFile."_tmp",  'recursive': 1})
+
+      call <SID>RenameFile(l:sTagsFile."_tmp", l:sTagsFile)
 
    endif
 
@@ -1385,7 +1422,7 @@ if !exists('g:indexer_ctagsCommandLineOptions')
 endif
 
 if !exists('g:indexer_ctagsJustAppendTagsAtFileSave')
-   let g:indexer_ctagsJustAppendTagsAtFileSave = 1
+   let g:indexer_ctagsJustAppendTagsAtFileSave = 0
 endif
 
 if !exists('g:indexer_ctagsDontSpecifyFilesIfPossible')

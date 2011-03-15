@@ -1,0 +1,7 @@
+3.0
+
+sort is always --yes, for Windows there's another SED version preferred 
+   TODO: test on linux
+background tags generation
+multiple projects supported
+
