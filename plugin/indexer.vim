@@ -1396,6 +1396,7 @@ endif
 
 
 
+" following options can be overwrited in .vimprj folders
 
 if !exists('g:indexer_useSedWhenAppend')
    let g:indexer_useSedWhenAppend = 1
@@ -1422,7 +1423,11 @@ if !exists('g:indexer_ctagsCommandLineOptions')
 endif
 
 if !exists('g:indexer_ctagsJustAppendTagsAtFileSave')
-   let g:indexer_ctagsJustAppendTagsAtFileSave = 0
+   if (has('win32') || has('win64'))
+      let g:indexer_ctagsJustAppendTagsAtFileSave = 0
+   else
+      let g:indexer_ctagsJustAppendTagsAtFileSave = 1
+   endif
 endif
 
 if !exists('g:indexer_ctagsDontSpecifyFilesIfPossible')
