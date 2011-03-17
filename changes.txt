@@ -1,7 +1,7 @@
 3.0
 
-sort is always --yes, for Windows there's another SED version preferred 
-   TODO: test on linux
-background tags generation
-multiple projects supported
+* Multiple projects supported. For example, you opened file1 from one project, and then you opened file2 from second project. Now, when you switch to file1, there's &tags for first project, and when you switch to file2, there's &tags for second project. You should not care about it.
+* Background tags generation. You have not to wait every time until all tags becomes generated.
+* By default, on Windows tags generates always for whole project, because of bugs in all Windows versions of Sed i have. Actually, now this isn't problem, because of tags generates in background.
+* Tags file is sorted now. In Indexer 2.x it was unsorted because of bugs in Sed, and to make tags unsorted was workaround. As i already said, in Linux Sed works fine, and on Windows Sed doesn't uses by default, so, tags file can be sorted =).
 
