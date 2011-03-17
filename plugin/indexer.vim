@@ -486,9 +486,8 @@ function! <SID>GetCtagsCommand(dParams)
    " symbols will be doubled.
    "
    " when using append with Sed on Windows (cygwin) we SHOULD NOT use sort, because of if there's sort, then
-   " tags file becomes damaged, i can't figure out why.
-   " TODO: very need to make sed work with sorted files too, because of 
-   "       Vim works much longer with unsorted file.
+   " tags file becomes damaged because of Sed's output is always with UNIX
+   " line-ends. Ctags at Windows fails with this file.
    "
    if (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave && s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend && (has('win32') || has('win64')))
       let l:sSortCode = '--sort=no'
