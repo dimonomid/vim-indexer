@@ -1,8 +1,8 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Last Change: 15 Mar 2011
-" Version:     3.00 beta
+" Last Change: 17 Mar 2011
+" Version:     3.00
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -14,8 +14,6 @@
 "
 " Опцию типа "менять рабочую директорию при смене проекта", и менять ее только
 " в том случае, если проект сменили, а не только файл.
-"
-" Перезагрузка проектов при сохранении файлов .vimprojects или .indexer_files
 "
 " ----------------
 "
@@ -216,8 +214,8 @@ function! <SID>ApplyVimprjSettings(sVimprjKey)
    let &tags = s:sTagsDefault
    let &path = s:sPathDefault
 
-   if (!empty(g:indexer_defaultSettingsFilename))
-      exec 'source '.g:indexer_defaultSettingsFilename
+   if (!empty(s:indexer_defaultSettingsFilename))
+      exec 'source '.s:indexer_defaultSettingsFilename
    endif
 
    if (!empty(s:dVimprjRoots[ a:sVimprjKey ].path))
@@ -1357,6 +1355,12 @@ endfunction
 " ************************************************************************************************
 
 " --------- init variables --------
+if !exists('g:indexer_defaultSettingsFilename')
+   let s:indexer_defaultSettingsFilename = ''
+else
+   let s:indexer_defaultSettingsFilename = g:indexer_defaultSettingsFilename
+endif
+
 if !exists('g:indexer_lookForProjectDir')
    let s:indexer_lookForProjectDir = 1
 else
@@ -1431,10 +1435,6 @@ endif
 
 if !exists('g:indexer_ctagsDontSpecifyFilesIfPossible')
    let g:indexer_ctagsDontSpecifyFilesIfPossible = '0'
-endif
-
-if !exists('g:indexer_defaultSettingsFilename')
-    let g:indexer_defaultSettingsFilename = ''
 endif
 
 
