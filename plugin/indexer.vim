@@ -1053,17 +1053,13 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
 endfunction
 
-
-
-
-
-
-" ************************************************************************************************
-"                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnNewFileOpened)
-" ************************************************************************************************
-
-function! <SID>OnBufSave()
-   let l:sSavedFile = <SID>ParsePath(expand('<afile>:p'))
+" Update tags for all projects that owns a file.
+" (now every file can be owned just by one project)
+"
+" param a:sFile - string like '%' or '<afile>' or something like that.
+" 
+function! <SID>UpdateTagsForFile(sFile, boolJustAppendTags)
+   let l:sSavedFile = <SID>ParsePath(expand(a:sFile.':p'))
    "let l:sSavedFilePath = <SID>ParsePath(expand('%:p:h'))
 
    " для каждого проекта, в который входит файл, ...
@@ -1077,13 +1073,24 @@ function! <SID>OnBufSave()
          call add(l:dCurProject.files, l:sSavedFile)
       endif
 
-      if g:indexer_ctagsJustAppendTagsAtFileSave
+      if a:boolJustAppendTags
          call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, l:sSavedFile)
       else
          call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, "")
       endif
 
    endfor
+endfunction
+
+
+
+
+" ************************************************************************************************
+"                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnNewFileOpened)
+" ************************************************************************************************
+
+function! <SID>OnBufSave()
+   call <SID>UpdateTagsForFile( '<afile>', s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave )
 endfunction
 
 function! <SID>OnBufEnter()
@@ -1477,7 +1484,7 @@ if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
 if exists(':IndexerRebuild') != 2
-   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTags(0)
+   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%', 0)
 endif
 
 
