@@ -1,8 +1,8 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Last Change: 17 Mar 2011
-" Version:     3.00
+" Last Change: 21 Mar 2011
+" Version:     3.1
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -450,6 +450,11 @@ function! <SID>IndexerInfo()
       echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
    endif
    echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
+   if !empty(v:servername)
+      echo '* Background tags generation: YES'
+   else
+      echo '* Background tags generation: NO. (because of servername is empty. Please read :help servername)'
+   endif
    echo '* Projects indexed: '.l:sProjects
    if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
       echo "* Files indexed: there's ".l:iFilesCnt.' files.' 
