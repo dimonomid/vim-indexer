@@ -89,6 +89,26 @@
 "  
 "
 
+function! <SID>IndexerGetCtagsVersion()
+
+   let l:dCtagsInfo = {'versionOutput' : '', 'boolCtagsExists' : 0, 'boolPatched' : 0, 'versionFirstLine' : ''}
+   let l:dCtagsInfo['versionOutput'] = system("ctags --version")
+
+   if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vExuberant")) > 0
+
+      let l:dCtagsInfo['boolCtagsExists'] = 1
+
+      let l:dCtagsInfo['versionFirstLine'] = substitute(l:dCtagsInfo['versionOutput'], "\\v^([^\r\n]*).*$", "\\1", "g")
+
+      if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vdimon\\.frank\\@gmail\\.com")) > 0
+         let l:dCtagsInfo['boolPatched'] = 1
+      endif
+
+   endif
+
+   return l:dCtagsInfo
+
+endfunction
 
 " ************************************************************************************************
 "                                   ASYNC COMMAND FUNCTIONS
@@ -455,6 +475,16 @@ function! <SID>IndexerInfo()
 
    endfor
 
+   let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
+
+   echo '* Indexer version: 3.11'
+
+   if !empty(s:dCtagsInfo['boolCtagsExists'])
+      echo '* Ctags version: '.s:dCtagsInfo['versionFirstLine']
+   else
+      echo '* Ctags version: NONE'
+   endif
+   
    if (s:dVimprjRoots[ s:curVimprjKey ].mode == '')
       echo '* Filelist: not found'
    elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
@@ -1512,6 +1542,11 @@ if exists(':IndexerRebuild') != 2
    command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%', 0)
 endif
 
+let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
+
+if empty(s:dCtagsInfo['boolCtagsExists'])
+   call confirm("Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work.")
+endif
 
 " DICTIONARY for acync commands
 "let s:dAsyncData = {}
