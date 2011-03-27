@@ -85,6 +85,19 @@
 "              ["file"] - key for s:dProjFilesParsed
 "              ["name"] - name of project
 "           
+" s:sLastCtagsCmd    - last executed ctags command
+" s:sLastCtagsOutput - output for last executed ctags command
+"
+" s:dCtagsInfo - DICTIONARY
+"     ["executable"] - name of executable. For example, "ctags" or
+"                      "ctags.exe", etc
+"     ["versionOutput"] - output for ctags --version
+"     ["boolCtagsExists"] - if ctags is found, then 1. Otherwise 0.
+"     ["boolPatched"] - if version ctags is patched by Dmitry Frank, then 1.
+"                       Otherwise 0.
+"     ["versionFirstLine"] - output for ctags --version, but first line only.
+"
+
 "        
 "  
 
@@ -232,8 +245,9 @@ function! <SID>_ExecNextAsyncTask()
 
       if l:dParams["mode"] == "AsyncModeCtags"
 
-         let l:sCmd = <SID>GetCtagsCommand(l:dParams["data"])
-         call <SID>IndexerAsyncCommand(l:sCmd, "Indexer_OnAsyncCommandComplete")
+         let s:sCurCtagsCmd = <SID>GetCtagsCommand(l:dParams["data"])
+         let s:sLastCtagsOutput = "** no output yet **"
+         call <SID>IndexerAsyncCommand(s:sCurCtagsCmd, "Indexer_OnAsyncCommandComplete")
 
       elseif l:dParams["mode"] == "AsyncModeSed"
 
@@ -294,11 +308,20 @@ function! <SID>Indexer_ParseCommandOutput(sOutput)
 
    if l:dParams['mode'] == 'AsyncModeCtags'
       " we need to save last ctags output, for debug
+      let s:sLastCtagsCmd = s:sCurCtagsCmd
       let s:sLastCtagsOutput = a:sOutput
 
+      " ctags output should be empty.
+      " if it is not, then we should show warning
       if len(matchlist(s:sLastCtagsOutput, "[a-zA-Z0-9_а-яА-Я.,-=!\\/]")) > 0
          if empty(s:indexer_disableCtagsWarning)
-            call confirm ("Indexer warning: ctags output was not empty: \n\"".s:sLastCtagsOutput."\"\n\nIf you want to disable this warning, please set option g:indexer_disableCtagsWarning=1")
+            let l:iMaxCmdLenToShow = 200
+            if strlen(s:sLastCtagsCmd) > l:iMaxCmdLenToShow
+               let l:sCtagsCmd = strpart(s:sLastCtagsCmd, 0, l:iMaxCmdLenToShow)."....(cutted, to see full command, type :IndexerDebugInfo)"
+            else
+               let l:sCtagsCmd = s:sLastCtagsCmd
+            endif
+            call confirm ("Indexer warning: ctags output was not empty: \n\"".s:sLastCtagsOutput."\"\n\nCtags command was:\n\"".l:sCtagsCmd."\"\n\nIf you want to disable this warning, please set option g:indexer_disableCtagsWarning=1")
          endif
       endif
    endif
@@ -512,6 +535,7 @@ function! <SID>IndexerDebugInfo()
    echo '* Ctags boolCtagsExists: '.s:dCtagsInfo['boolCtagsExists']
    echo '* Ctags boolPatched: '.s:dCtagsInfo['boolPatched']
    echo '* Ctags versionFirstLine: '.s:dCtagsInfo['versionFirstLine']
+   echo '* Ctags last command: "'.s:sLastCtagsCmd.'"'
    echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
 endfunction
 
@@ -1635,6 +1659,9 @@ let s:sIndexerVersion = '3.12'
 if empty(s:dCtagsInfo['boolCtagsExists'])
    echomsg "Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work."
 endif
+
+let s:sLastCtagsCmd =      "** no ctags commands yet **"
+let s:sLastCtagsOutput =   "** no output yet **"
 
 " DICTIONARY for acync commands
 "let s:dAsyncData = {}
