@@ -2,7 +2,7 @@
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
 " Last Change: 24 Mar 2011
-" Version:     3.11
+" Version:     3.12
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -139,6 +139,10 @@ function! <SID>IndexerGetCtagsVersion()
 
    return l:dCtagsInfo
 
+endfunction
+
+function! <SID>Indexer_DetectCtags()
+   let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
 endfunction
 
 " ************************************************************************************************
@@ -294,7 +298,7 @@ function! <SID>Indexer_ParseCommandOutput(sOutput)
 
       if len(matchlist(s:sLastCtagsOutput, "[a-zA-Z0-9_а-яА-Я.,-=!\\/]")) > 0
          if empty(s:indexer_disableCtagsWarning)
-            call confirm("Indexer warning: ctags output was not empty: \n\"".s:sLastCtagsOutput."\"\n\nIf you want to disable this warning, please set option g:indexer_disableCtagsWarning=1")
+            call confirm ("Indexer warning: ctags output was not empty: \n\"".s:sLastCtagsOutput."\"\n\nIf you want to disable this warning, please set option g:indexer_disableCtagsWarning=1")
          endif
       endif
    endif
@@ -541,7 +545,7 @@ function! <SID>IndexerInfo()
 
    endfor
 
-   let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
+   call <SID>Indexer_DetectCtags()
 
    echo '* Indexer version: '.s:sIndexerVersion
 
@@ -737,40 +741,47 @@ endfunction
 "                  otherwise, updating tags for just this file with Append.
 function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
-   let l:sTagsFile = s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename
-   let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ a:sProjName ]
 
-   if (!empty(a:sSavedFile) && filereadable(l:sTagsFile))
-      " just appending tags from just saved file. (from one file!)
-      if (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend)
-         call <SID>ExecSed({'sTagsFile': l:sTagsFile, 'sFilenameToDeleteTagsWith': a:sSavedFile})
-      endif
-      call <SID>ExecCtags({'append': 1, 'recursive': 0, 'sTagsFile': l:sTagsFile, 'sFiles': a:sSavedFile})
-
-   else
-      " need to rebuild all tags.
-
-      " deleting old tagsfile
-      "if (filereadable(l:sTagsFile))
-         "call delete(l:sTagsFile)
-      "endif
-      "let l:dAsyncParams = {'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } }
-
-      call <SID>DeleteFile(l:sTagsFile."_tmp")
-
-      " generating tags for files
-      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.files,          'sTagsFile': l:sTagsFile."_tmp",  'recursive': 0})
-      " generating tags for directories
-      call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.pathsForCtags,  'sTagsFile': l:sTagsFile."_tmp",  'recursive': 1})
-
-      call <SID>RenameFile(l:sTagsFile."_tmp", l:sTagsFile)
-
+   if empty(s:dCtagsInfo['boolCtagsExists'])
+      call <SID>Indexer_DetectCtags()
    endif
+   
+   if !empty(s:dCtagsInfo['boolCtagsExists'])
+      let l:sTagsFile = s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename
+      let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ a:sProjName ]
+
+      if (!empty(a:sSavedFile) && filereadable(l:sTagsFile))
+         " just appending tags from just saved file. (from one file!)
+         if (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend)
+            call <SID>ExecSed({'sTagsFile': l:sTagsFile, 'sFilenameToDeleteTagsWith': a:sSavedFile})
+         endif
+         call <SID>ExecCtags({'append': 1, 'recursive': 0, 'sTagsFile': l:sTagsFile, 'sFiles': a:sSavedFile})
+
+      else
+         " need to rebuild all tags.
+
+         " deleting old tagsfile
+         "if (filereadable(l:sTagsFile))
+            "call delete(l:sTagsFile)
+         "endif
+         "let l:dAsyncParams = {'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } }
+
+         call <SID>DeleteFile(l:sTagsFile."_tmp")
+
+         " generating tags for files
+         call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.files,          'sTagsFile': l:sTagsFile."_tmp",  'recursive': 0})
+         " generating tags for directories
+         call <SID>ExecCtagsForListOfFiles({'lFilelist': l:dCurProject.pathsForCtags,  'sTagsFile': l:sTagsFile."_tmp",  'recursive': 1})
+
+         call <SID>RenameFile(l:sTagsFile."_tmp", l:sTagsFile)
+
+      endif
 
 
 
 
-   let s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].boolIndexed = 1
+      let s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].boolIndexed = 1
+   endif
 
 endfunction
 
@@ -1618,11 +1629,11 @@ if exists(':IndexerRebuild') != 2
    command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%', 0)
 endif
 
-let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
-let s:sIndexerVersion = '3.11'
+call <SID>Indexer_DetectCtags()
+let s:sIndexerVersion = '3.12'
 
 if empty(s:dCtagsInfo['boolCtagsExists'])
-   call confirm("Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work.")
+   echomsg "Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work."
 endif
 
 " DICTIONARY for acync commands
