@@ -245,9 +245,9 @@ function! <SID>_ExecNextAsyncTask()
 
       if l:dParams["mode"] == "AsyncModeCtags"
 
-         let s:sCurCtagsCmd = <SID>GetCtagsCommand(l:dParams["data"])
+         let s:sLastCtagsCmd = <SID>GetCtagsCommand(l:dParams["data"])
          let s:sLastCtagsOutput = "** no output yet **"
-         call <SID>IndexerAsyncCommand(s:sCurCtagsCmd, "Indexer_OnAsyncCommandComplete")
+         call <SID>IndexerAsyncCommand(s:sLastCtagsCmd, "Indexer_OnAsyncCommandComplete")
 
       elseif l:dParams["mode"] == "AsyncModeSed"
 
@@ -308,7 +308,6 @@ function! <SID>Indexer_ParseCommandOutput(sOutput)
 
    if l:dParams['mode'] == 'AsyncModeCtags'
       " we need to save last ctags output, for debug
-      let s:sLastCtagsCmd = s:sCurCtagsCmd
       let s:sLastCtagsOutput = a:sOutput
 
       " ctags output should be empty.
