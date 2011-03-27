@@ -2,7 +2,7 @@
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
 " Last Change: 24 Mar 2011
-" Version:     3.12
+" Version:     3.14
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -138,7 +138,7 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
    " async works if only v:servername is not empty!
    " otherwise we should wait for output here.
 
-   if !empty(v:servername)
+   if <SID>_IsBackgroundEnabled()
 
       " String together and execute.
       let temp_file = tempname()
@@ -153,12 +153,10 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
 
       call <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
    else
-      " v:servername is empty!
+      " v:servername is empty! (or g:indexer_backgroundDisabled is not empty)
       " so, no async is present.
       let l:sCmdOutput = system(a:command)
       call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
-
-      let s:boolAsyncCommandInProgress = 0
 
    endif
 
@@ -186,6 +184,8 @@ function! <SID>_ExecNextAsyncTask()
       let s:iAsyncTaskCur  += 1
       let s:iAsyncTaskNext += 1
 
+      call <SID>_AddToDebugLog(s:DEB_LEVEL__ASYNC, 'asyncCmd', l:dParams)
+
       if l:dParams["mode"] == "AsyncModeCtags"
 
          let s:sLastCtagsCmd = <SID>GetCtagsCommand(l:dParams["data"])
@@ -203,7 +203,8 @@ function! <SID>_ExecNextAsyncTask()
          endif
 
          " we should make dummy async call
-         call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
+         "call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
+         call <SID>_AsyncDummyComplete()
 
       elseif l:dParams["mode"] == "AsyncModeRename"
 
@@ -215,16 +216,19 @@ function! <SID>_ExecNextAsyncTask()
          endif
 
          " we should make dummy async call
-         call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
-
+         "call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
+         call <SID>_AsyncDummyComplete()
       endif
    endif
 
 endfunction
 
+function! <SID>_AsyncDummyComplete()
+   call <SID>Indexer_ParseCommandOutput("dummy")
+endfunction
+
 function! Indexer_OnAsyncCommandComplete(temp_file_name)
 
-   let s:boolAsyncCommandInProgress = 0
 
    let l:lCmdOutput = readfile(a:temp_file_name)
    let l:sCmdOutput = join(l:lCmdOutput, "\n")
@@ -235,19 +239,98 @@ function! Indexer_OnAsyncCommandComplete(temp_file_name)
    "wincmd w
    "redraw
 
-   call <SID>_ExecNextAsyncTask()
-
 endfunction
 
 
 " ************************************************************************************************
-"                                   ADDITIONAL FUNCTIONS
+"                                      DEBUG FUNCTIONS
 " ************************************************************************************************
+
+function! <SID>_AddToDebugLog(iLevel, sType, dData)
+
+   if s:indexer_debugLogLevel >= a:iLevel
+      let l:dLogItem = {'type' : a:sType, 'data' : a:dData}
+      call add(s:lDebug, l:dLogItem)
+
+      " write log item to file, if file specified
+      if !empty(s:indexer_debugLogFilename)
+         exec ':redir >> '.s:indexer_debugLogFilename.' | silent call <SID>_EchoLogItem(l:dLogItem) | redir END'
+      endif
+   endif
+
+endfunction
+
+function! <SID>_EchoLogItem(dLogItem)
+   if exists("*strftime")
+      echo '* -------------------- '.strftime("%c").' --------------------*'
+   else
+      echo '* -------------------- *'
+   endif
+   echo 'type: '.a:dLogItem["type"].'; data:'
+   echo a:dLogItem["data"]
+endfunction
+
+function! <SID>IndexerDebugLog()
+   if !empty(s:indexer_debugLogLevel)
+
+      for l:dLogItem in s:lDebug
+         call <SID>_EchoLogItem(l:dLogItem)
+      endfor
+
+   else
+      echo 'Debug log is disabled. To enable, please define g:indexer_debugLogLevel > 0.'
+   endif
+endfunction
+
+function! <SID>IndexerDebugInfo()
+   echo '* Ctags executable: '.s:dCtagsInfo['executable']
+   echo '* Ctags versionOutput: '.s:dCtagsInfo['versionOutput']
+   echo '* Ctags boolCtagsExists: '.s:dCtagsInfo['boolCtagsExists']
+   echo '* Ctags boolPatched: '.s:dCtagsInfo['boolPatched']
+   echo '* Ctags versionFirstLine: '.s:dCtagsInfo['versionFirstLine']
+   echo '* Ctags last command: "'.s:sLastCtagsCmd.'"'
+   echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
+endfunction
+
+
+
+" ************************************************************************************************
+"                                      ADDITIONAL FUNCTIONS
+" ************************************************************************************************
+
+function! <SID>_IsBackgroundEnabled()
+   return (!empty(v:servername) && empty(s:dVimprjRoots[ s:curVimprjKey ].backgroundDisabled))
+endfunction
+
+function! <SID>_GetBackgroundComment()
+   let l:sComment = ""
+
+   if empty(v:servername)
+      if !empty(l:sComment)
+         let l:sComment .= ", "
+      endif
+      let l:sComment .= "because of v:servername is empty (:help servername)"
+   endif
+
+   if !empty(s:dVimprjRoots[ s:curVimprjKey ].backgroundDisabled)
+      if !empty(l:sComment)
+         let l:sComment .= ", "
+      endif
+      let l:sComment .= "because of g:indexer_backgroundDisabled is not empty"
+   endif
+
+   if !empty(l:sComment)
+      let l:sComment = "(".l:sComment.")"
+   endif
+
+   return l:sComment
+endfunction
 
 function! <SID>Indexer_ParseCommandOutput(sOutput)
    let l:dParams = s:dAsyncTasks[ s:iAsyncTaskCur ]
    unlet s:dAsyncTasks[ s:iAsyncTaskCur ]
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ASYNC, 'asyncCmdResponse', {'mode' : l:dParams['mode'], 'output' : a:sOutput})
 
    if l:dParams['mode'] == 'AsyncModeCtags'
       " we need to save last ctags output, for debug
@@ -268,6 +351,9 @@ function! <SID>Indexer_ParseCommandOutput(sOutput)
       endif
    endif
 
+   let s:boolAsyncCommandInProgress = 0
+   call <SID>_ExecNextAsyncTask()
+
 endfunction
 
 function! <SID>DeleteFile(filename)
@@ -281,6 +367,7 @@ endfunction
 " applies all settings from .vimprj dir
 function! <SID>ApplyVimprjSettings(sVimprjKey)
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
    let $INDEXER_PROJECT_ROOT = s:dVimprjRoots[ a:sVimprjKey ].proj_root
 
    let &tags = s:sTagsDefault
@@ -312,6 +399,7 @@ function! <SID>ApplyVimprjSettings(sVimprjKey)
    " переключаем рабочую директорию
    exec "cd ".s:dVimprjRoots[ a:sVimprjKey ]["cd_path"]
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __ApplyVimprjSettings__', {})
 endfunction
 
 
@@ -339,12 +427,18 @@ function! <SID>IsBufChanged()
 endfunction
 
 function! <SID>SetCurrentFile()
+
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __SetCurrentFile__', {'filename' : expand('%')})
+
    if (exists("s:dFiles[".bufnr('%')."]"))
       let s:curFileNum = bufnr('%')
    else
       let s:curFileNum = 0
    endif
    let s:curVimprjKey = s:dFiles[ s:curFileNum ].sVimprjKey
+
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __SetCurrentFile__', {'text' : ('s:curFileNum='.s:curFileNum.'; s:curVimprjKey='.s:curVimprjKey)})
+
 endfunction
 
 function! <SID>AddCurrentFile(sVimprjKey)
@@ -364,6 +458,9 @@ endfunction
 function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
 
    if (!exists("s:dVimprjRoots['".a:sKey."']"))
+
+      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sKey' : a:sKey, 'sPath' : a:sPath, 'sCdPath' : a:sCdPath})
+
       let s:dVimprjRoots[a:sKey] = {}
       let s:dVimprjRoots[a:sKey]["cd_path"] = a:sCdPath
       let s:dVimprjRoots[a:sKey]["proj_root"] = a:sPath
@@ -380,8 +477,10 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
       let s:dVimprjRoots[a:sKey]["ctagsCommandLineOptions"]       = g:indexer_ctagsCommandLineOptions
       let s:dVimprjRoots[a:sKey]["ctagsJustAppendTagsAtFileSave"] = g:indexer_ctagsJustAppendTagsAtFileSave
       let s:dVimprjRoots[a:sKey]["useDirsInsteadOfFiles"]         = g:indexer_ctagsDontSpecifyFilesIfPossible
+      let s:dVimprjRoots[a:sKey]["backgroundDisabled"]            = g:indexer_backgroundDisabled
       let s:dVimprjRoots[a:sKey]["mode"]                          = ""
 
+      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __AddNewVimprjRoot__', {})
    endif
 endfunction
 
@@ -395,6 +494,7 @@ function! <SID>SetDefaultIndexerOptions()
    let g:indexer_ctagsCommandLineOptions         = s:def_ctagsCommandLineOptions
    let g:indexer_ctagsJustAppendTagsAtFileSave   = s:def_ctagsJustAppendTagsAtFileSave
    let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
+   let g:indexer_backgroundDisabled              = s:def_backgroundDisabled
 endfunction
 
 
@@ -470,17 +570,6 @@ endfunction
 
 
 
-
-function! <SID>IndexerDebugInfo()
-   echo '* Ctags executable: '.s:dCtagsInfo['executable']
-   echo '* Ctags versionOutput: '.s:dCtagsInfo['versionOutput']
-   echo '* Ctags boolCtagsExists: '.s:dCtagsInfo['boolCtagsExists']
-   echo '* Ctags boolPatched: '.s:dCtagsInfo['boolPatched']
-   echo '* Ctags versionFirstLine: '.s:dCtagsInfo['versionFirstLine']
-   echo '* Ctags last command: "'.s:sLastCtagsCmd.'"'
-   echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
-endfunction
-
 function! <SID>IndexerInfo()
 
    let l:sProjects = ""
@@ -535,10 +624,10 @@ function! <SID>IndexerInfo()
          echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
       endif
       echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
-      if !empty(v:servername)
+      if <SID>_IsBackgroundEnabled()
          echo '* Background tags generation: YES'
       else
-         echo '* Background tags generation: NO. (because of servername is empty. Please read :help servername)'
+         echo '* Background tags generation: NO. '.<SID>_GetBackgroundComment()
       endif
       echo '* Projects indexed: '.l:sProjects
       if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
@@ -764,6 +853,7 @@ endfunction
 "                  otherwise, updating tags for just this file with Append.
 function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __UpdateTagsForProject__', {'sProjFileKey' : a:sProjFileKey, 'sProjName' : a:sProjName, 'sSavedFile' : a:sSavedFile})
 
    if empty(s:dCtagsInfo['boolCtagsExists'])
       call <SID>Indexer_DetectCtags()
@@ -806,6 +896,7 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
       let s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].boolIndexed = 1
    endif
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __UpdateTagsForProject__', {'sProjName' : a:sProjName, 'sSavedFile' : a:sSavedFile})
 endfunction
 
 " re-read projects from given file, 
@@ -1146,6 +1237,8 @@ endfunction
 
 function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __ParseProjectSettingsFile__', {'filename' : s:dProjFilesParsed[ a:sProjFileKey ]["filename"]})
+
    let l:bufVimprjKey = s:curVimprjKey
    let s:curVimprjKey = s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"]
    call <SID>ApplyVimprjSettings(s:curVimprjKey)
@@ -1206,6 +1299,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
    endfor
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __ParseProjectSettingsFile__', {})
 endfunction
 
 " Update tags for all projects that owns a file.
@@ -1241,11 +1335,13 @@ endfunction
 
 
 " ************************************************************************************************
-"                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnNewFileOpened)
+"                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnFileOpen)
 " ************************************************************************************************
 
 function! <SID>OnBufSave()
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnBufSave__', {'filename' : expand('<afile>')})
    call <SID>UpdateTagsForFile( '<afile>', s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave )
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
 
 function! <SID>OnBufEnter()
@@ -1253,12 +1349,14 @@ function! <SID>OnBufEnter()
       return
    endif
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __OnBufEnter__', {'filename' : expand('%')})
+
    if (!<SID>IsBufChanged())
        return
    endif
 
-   if empty(s:boolOnNewFileOpenedExecuted)
-      call <SID>OnNewFileOpened()
+   if empty(s:bool_OnFileOpen_executed)
+      call <SID>OnFileOpen()
    endif
 
    "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
@@ -1266,17 +1364,20 @@ function! <SID>OnBufEnter()
    call <SID>SetCurrentFile()
 
    call <SID>ApplyVimprjSettings(s:curVimprjKey)
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
 
 endfunction
 
 
 
-function! <SID>OnNewFileOpened()
+function! <SID>OnFileOpen()
    if (<SID>NeedSkipBuffer('%'))
       return
    endif
 
-   let s:boolOnNewFileOpenedExecuted = 1
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnFileOpen__', {'filename' : expand('%')})
+
+   let s:bool_OnFileOpen_executed = 1
 
    "let l:sTmp = input("OnNewFileOpened_".getbufvar('%', "&buftype"))
 
@@ -1505,6 +1606,7 @@ function! <SID>OnNewFileOpened()
    let s:curFileNum = 0
 
 
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
 
 
@@ -1584,6 +1686,33 @@ else
    let s:indexer_disableCtagsWarning = g:indexer_disableCtagsWarning
 endif
 
+if !exists('g:indexer_debugLogLevel')
+   let s:indexer_debugLogLevel = 0
+else
+   let s:indexer_debugLogLevel = g:indexer_debugLogLevel
+endif
+
+if !exists('g:indexer_debugLogFilename')
+   let s:indexer_debugLogFilename = ''
+else
+   let s:indexer_debugLogFilename = g:indexer_debugLogFilename
+
+   if !empty(s:indexer_debugLogFilename) && s:indexer_debugLogLevel > 0
+      exec ':redir >> '.s:indexer_debugLogFilename
+      exec ':silent echo ""'
+      exec ':silent echo "**********************************************************************************************"'
+      exec ':silent echo " Log opened."'
+      exec ':silent echo " Level: '.s:indexer_debugLogLevel.'."'
+      if exists("*strftime")
+         exec ':silent echo " Time: '.strftime("%c").'"'
+      endif
+      exec ':silent echo "**********************************************************************************************"'
+      exec ':silent echo ""'
+      exec ':redir END'
+   endif
+
+endif
+
 
 
 
@@ -1627,6 +1756,10 @@ if !exists('g:indexer_ctagsDontSpecifyFilesIfPossible')
    let g:indexer_ctagsDontSpecifyFilesIfPossible = '0'
 endif
 
+if !exists('g:indexer_backgroundDisabled')
+   let g:indexer_backgroundDisabled = 0
+endif
+
 
 let s:def_useSedWhenAppend                = g:indexer_useSedWhenAppend
 let s:def_indexerListFilename             = g:indexer_indexerListFilename
@@ -1636,6 +1769,7 @@ let s:def_enableWhenProjectDirFound       = g:indexer_enableWhenProjectDirFound
 let s:def_ctagsCommandLineOptions         = g:indexer_ctagsCommandLineOptions
 let s:def_ctagsJustAppendTagsAtFileSave   = g:indexer_ctagsJustAppendTagsAtFileSave
 let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPossible
+let s:def_backgroundDisabled              = g:indexer_backgroundDisabled
 
 " -------- init commands ---------
 
@@ -1645,6 +1779,9 @@ endif
 if exists(':IndexerDebugInfo') != 2
    command -nargs=? -complete=file IndexerDebugInfo call <SID>IndexerDebugInfo()
 endif
+if exists(':IndexerDebugLog') != 2
+   command -nargs=? -complete=file IndexerDebugLog call <SID>IndexerDebugLog()
+endif
 if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
@@ -1653,7 +1790,7 @@ if exists(':IndexerRebuild') != 2
 endif
 
 call <SID>Indexer_DetectCtags()
-let s:sIndexerVersion = '3.12'
+let s:sIndexerVersion = '3.14'
 
 if empty(s:dCtagsInfo['boolCtagsExists'])
    echomsg "Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work."
@@ -1669,7 +1806,13 @@ let s:iAsyncTaskCur = -1
 let s:iAsyncTaskNext = 0
 let s:iAsyncTaskLast = 0
 let s:boolAsyncCommandInProgress = 0
-let s:boolOnNewFileOpenedExecuted = 0
+let s:bool_OnFileOpen_executed = 0
+
+let s:lDebug = []
+
+let s:DEB_LEVEL__ASYNC  = 1
+let s:DEB_LEVEL__PARSE  = 2
+let s:DEB_LEVEL__ALL    = 3
 
 " запоминаем начальные &tags, &path
 let s:sTagsDefault = &tags
@@ -1685,11 +1828,11 @@ let s:curFileNum = 0
 call <SID>AddNewVimprjRoot("default", "", getcwd())
 let s:dFiles[ 0 ] = {'sVimprjKey' : 'default', 'projects': []}
 
-" указываем обработчик открытия нового файла: OnNewFileOpened
+" указываем обработчик открытия нового файла: OnFileOpen
 augroup Indexer_LoadFile
    autocmd! Indexer_LoadFile BufReadPost
-   autocmd Indexer_LoadFile BufReadPost * call <SID>OnNewFileOpened()
-   autocmd Indexer_LoadFile BufNewFile * call <SID>OnNewFileOpened()
+   autocmd Indexer_LoadFile BufReadPost * call <SID>OnFileOpen()
+   autocmd Indexer_LoadFile BufNewFile * call <SID>OnFileOpen()
 augroup END
 
 " указываем обработчик входа в другой буфер: OnBufEnter
