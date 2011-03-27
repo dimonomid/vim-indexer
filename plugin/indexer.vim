@@ -87,23 +87,54 @@
 "           
 "        
 "  
-"
+
+function! <SID>IndexerGetCtagsName()
+   " Location of the exuberant ctags tool_cmd
+   " (token from taglist plugin)
+
+   let l:sCtagsName = ''
+   if executable('ctags')
+      let l:sCtagsName = 'ctags'
+   elseif executable('exuberant-ctags')
+      " On Debian Linux, exuberant ctags is installed
+      " as exuberant-ctags
+      let l:sCtagsName = 'exuberant-ctags'
+   elseif executable('exctags')
+      " On Free-BSD, exuberant ctags is installed as exctags
+      let l:sCtagsName = 'exctags'
+   elseif executable('ctags.exe')
+      let l:sCtagsName = 'ctags.exe'
+   elseif executable('tags')
+      let l:sCtagsName = 'tags'
+   endif
+
+   return l:sCtagsName
+
+endfunction
 
 function! <SID>IndexerGetCtagsVersion()
 
-   let l:dCtagsInfo = {'versionOutput' : '', 'boolCtagsExists' : 0, 'boolPatched' : 0, 'versionFirstLine' : ''}
-   let l:dCtagsInfo['versionOutput'] = system("ctags --version")
+   let l:dCtagsInfo = {'executable' : '', 'versionOutput' : '', 'boolCtagsExists' : 0, 'boolPatched' : 0, 'versionFirstLine' : ''}
 
-   if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vExuberant")) > 0
+   let l:dCtagsInfo['executable'] = <SID>IndexerGetCtagsName()
 
+   if !empty(l:dCtagsInfo['executable'])
       let l:dCtagsInfo['boolCtagsExists'] = 1
 
-      let l:dCtagsInfo['versionFirstLine'] = substitute(l:dCtagsInfo['versionOutput'], "\\v^([^\r\n]*).*$", "\\1", "g")
+      let l:dCtagsInfo['versionOutput'] = system(l:dCtagsInfo['executable']." --version")
 
-      if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vdimon\\.frank\\@gmail\\.com")) > 0
-         let l:dCtagsInfo['boolPatched'] = 1
+      if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vExuberant")) > 0
+
+         let l:dCtagsInfo['versionFirstLine'] = substitute(l:dCtagsInfo['versionOutput'], "\\v^([^\r\n]*).*$", "\\1", "g")
+
+         if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vdimon\\.frank\\@gmail\\.com")) > 0
+            let l:dCtagsInfo['boolPatched'] = 1
+         endif
+
       endif
-
+   else
+      " if executable is empty, let's set it to "ctags", anyway.
+      let l:dCtagsInfo['executable'] = 'ctags'
    endif
 
    return l:dCtagsInfo
@@ -164,8 +195,11 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
    else
       " v:servername is empty!
       " so, no async is present.
-      let l:resp = system(a:command)
+      let l:sCmdOutput = system(a:command)
+      call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
+
       let s:boolAsyncCommandInProgress = 0
+
    endif
 
 endfunction
@@ -188,7 +222,8 @@ function! <SID>_ExecNextAsyncTask()
    if !s:boolAsyncCommandInProgress && s:iAsyncTaskNext < s:iAsyncTaskLast
       let s:boolAsyncCommandInProgress = 1
       let l:dParams = s:dAsyncTasks[ s:iAsyncTaskNext ]
-      unlet s:dAsyncTasks[ s:iAsyncTaskNext ]
+      " s:dAsyncTasks unlets in <SID>Indexer_ParseCommandOutput()
+      let s:iAsyncTaskCur  += 1
       let s:iAsyncTaskNext += 1
 
       if l:dParams["mode"] == "AsyncModeCtags"
@@ -207,7 +242,7 @@ function! <SID>_ExecNextAsyncTask()
          endif
 
          " we should make dummy async call
-         call <SID>IndexerAsyncCommand("ctags --version", "Indexer_OnAsyncCommandComplete")
+         call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
 
       elseif l:dParams["mode"] == "AsyncModeRename"
 
@@ -219,7 +254,7 @@ function! <SID>_ExecNextAsyncTask()
          endif
 
          " we should make dummy async call
-         call <SID>IndexerAsyncCommand("ctags --version", "Indexer_OnAsyncCommandComplete")
+         call <SID>IndexerAsyncCommand(s:dCtagsInfo['executable']." --version", "Indexer_OnAsyncCommandComplete")
 
       endif
    endif
@@ -229,6 +264,11 @@ endfunction
 function! Indexer_OnAsyncCommandComplete(temp_file_name)
 
    let s:boolAsyncCommandInProgress = 0
+
+   let l:lCmdOutput = readfile(a:temp_file_name)
+   let l:sCmdOutput = join(l:lCmdOutput, "\n")
+
+   call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
 
    "exec "split " . a:temp_file_name
    "wincmd w
@@ -242,6 +282,24 @@ endfunction
 " ************************************************************************************************
 "                                   ADDITIONAL FUNCTIONS
 " ************************************************************************************************
+
+function! <SID>Indexer_ParseCommandOutput(sOutput)
+   let l:dParams = s:dAsyncTasks[ s:iAsyncTaskCur ]
+   unlet s:dAsyncTasks[ s:iAsyncTaskCur ]
+
+
+   if l:dParams['mode'] == 'AsyncModeCtags'
+      " we need to save last ctags output, for debug
+      let s:sLastCtagsOutput = a:sOutput
+
+      if len(matchlist(s:sLastCtagsOutput, "[a-zA-Z0-9_а-яА-Я.,-=!\\/]")) > 0
+         if empty(s:indexer_disableCtagsWarning)
+            call confirm("Indexer warning: ctags output was not empty: \n\"".s:sLastCtagsOutput."\"\n\nIf you want to disable this warning, please set option g:indexer_disableCtagsWarning=1")
+         endif
+      endif
+   endif
+
+endfunction
 
 function! <SID>DeleteFile(filename)
    call <SID>AddNewAsyncTask({'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : a:filename } })
@@ -444,6 +502,14 @@ endfunction
 
 
 
+function! <SID>IndexerDebugInfo()
+   echo '* Ctags executable: '.s:dCtagsInfo['executable']
+   echo '* Ctags versionOutput: '.s:dCtagsInfo['versionOutput']
+   echo '* Ctags boolCtagsExists: '.s:dCtagsInfo['boolCtagsExists']
+   echo '* Ctags boolPatched: '.s:dCtagsInfo['boolPatched']
+   echo '* Ctags versionFirstLine: '.s:dCtagsInfo['versionFirstLine']
+   echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
+endfunction
 
 function! <SID>IndexerInfo()
 
@@ -477,48 +543,48 @@ function! <SID>IndexerInfo()
 
    let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
 
-   echo '* Indexer version: 3.11'
+   echo '* Indexer version: '.s:sIndexerVersion
 
-   if !empty(s:dCtagsInfo['boolCtagsExists'])
+   if empty(s:dCtagsInfo['boolCtagsExists'])
+      echo '* Error: Ctags NOT FOUND. You need to install Exuberant Ctags to make Indexer work. The better way is to install patched ctags: http://dfrank.ru/ctags581/en.html'
+   else
       echo '* Ctags version: '.s:dCtagsInfo['versionFirstLine']
-   else
-      echo '* Ctags version: NONE'
-   endif
-   
-   if (s:dVimprjRoots[ s:curVimprjKey ].mode == '')
-      echo '* Filelist: not found'
-   elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
-      echo '* Filelist: indexer file: '.s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename
-   elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
-      echo '* Filelist: project file: '.s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename
-   else
-      echo '* Filelist: Unknown'
-   endif
-   if (s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
-      echo '* Index-mode: DIRS. (option g:indexer_ctagsDontSpecifyFilesIfPossible is ON)'
-   else
-      echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
-   endif
-   echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
-   if !empty(v:servername)
-      echo '* Background tags generation: YES'
-   else
-      echo '* Background tags generation: NO. (because of servername is empty. Please read :help servername)'
-   endif
-   echo '* Projects indexed: '.l:sProjects
-   if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
-      echo "* Files indexed: there's ".l:iFilesCnt.' files.' 
-      " Type :IndexerFiles to list'
-      echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
-      ".join(s:dParseGlobal.not_exist, ', ')
-   endif
+      
+      if (s:dVimprjRoots[ s:curVimprjKey ].mode == '')
+         echo '* Filelist: not found'
+      elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'IndexerFile')
+         echo '* Filelist: indexer file: '.s:dVimprjRoots[ s:curVimprjKey ].indexerListFilename
+      elseif (s:dVimprjRoots[ s:curVimprjKey ].mode == 'ProjectFile')
+         echo '* Filelist: project file: '.s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename
+      else
+         echo '* Filelist: Unknown'
+      endif
+      if (s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
+         echo '* Index-mode: DIRS. (option g:indexer_ctagsDontSpecifyFilesIfPossible is ON)'
+      else
+         echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
+      endif
+      echo '* When saving file: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
+      if !empty(v:servername)
+         echo '* Background tags generation: YES'
+      else
+         echo '* Background tags generation: NO. (because of servername is empty. Please read :help servername)'
+      endif
+      echo '* Projects indexed: '.l:sProjects
+      if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
+         echo "* Files indexed: there's ".l:iFilesCnt.' files. Type :IndexerFiles for list.'
+         " Type :IndexerFiles to list'
+         echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
+         ".join(s:dParseGlobal.not_exist, ', ')
+      endif
 
-   echo "* Root paths: ".l:sPathsRoot
-   echo "* Paths for ctags: ".l:sPathsForCtags
+      echo "* Root paths: ".l:sPathsRoot
+      echo "* Paths for ctags: ".l:sPathsForCtags
 
-   echo '* Paths (with all subfolders): '.&path
-   echo '* Tags file: '.&tags
-   echo '* Project root: '.($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found').'  (Project root is a directory which contains "'.s:indexer_dirNameForSearch.'" directory)'
+      echo '* Paths (with all subfolders): '.&path
+      echo '* Tags file: '.&tags
+      echo '* Project root: '.($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found').'  (Project root is a directory which contains "'.s:indexer_dirNameForSearch.'" directory)'
+   endif
 endfunction
 
 
@@ -562,7 +628,7 @@ function! <SID>GetCtagsCommand(dParams)
    endif
 
    let l:sTagsFile = '"'.a:dParams.sTagsFile.'"'
-   let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
+   let l:sCmd = s:dCtagsInfo['executable'].' -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
 
    "if (has('win32') || has('win64'))
       "let l:sCmd = 'ctags -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.s:dVimprjRoots[ s:curVimprjKey ].ctagsCommandLineOptions.' '.a:dParams.sFiles
@@ -1478,6 +1544,13 @@ else
    let s:indexer_maxOSCommandLen = g:indexer_maxOSCommandLen
 endif
 
+if !exists('g:indexer_disableCtagsWarning')
+   let s:indexer_disableCtagsWarning = 0
+else
+   let s:indexer_disableCtagsWarning = g:indexer_disableCtagsWarning
+endif
+
+
 
 
 
@@ -1535,6 +1608,9 @@ let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPos
 if exists(':IndexerInfo') != 2
    command -nargs=? -complete=file IndexerInfo call <SID>IndexerInfo()
 endif
+if exists(':IndexerDebugInfo') != 2
+   command -nargs=? -complete=file IndexerDebugInfo call <SID>IndexerDebugInfo()
+endif
 if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
@@ -1543,6 +1619,7 @@ if exists(':IndexerRebuild') != 2
 endif
 
 let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
+let s:sIndexerVersion = '3.11'
 
 if empty(s:dCtagsInfo['boolCtagsExists'])
    call confirm("Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work.")
@@ -1551,6 +1628,7 @@ endif
 " DICTIONARY for acync commands
 "let s:dAsyncData = {}
 let s:dAsyncTasks = {}
+let s:iAsyncTaskCur = -1
 let s:iAsyncTaskNext = 0
 let s:iAsyncTaskLast = 0
 let s:boolAsyncCommandInProgress = 0
