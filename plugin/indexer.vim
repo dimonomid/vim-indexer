@@ -101,63 +101,6 @@
 "        
 "  
 
-function! <SID>IndexerGetCtagsName()
-   " Location of the exuberant ctags tool_cmd
-   " (token from taglist plugin)
-
-   let l:sCtagsName = ''
-   if executable('ctags')
-      let l:sCtagsName = 'ctags'
-   elseif executable('exuberant-ctags')
-      " On Debian Linux, exuberant ctags is installed
-      " as exuberant-ctags
-      let l:sCtagsName = 'exuberant-ctags'
-   elseif executable('exctags')
-      " On Free-BSD, exuberant ctags is installed as exctags
-      let l:sCtagsName = 'exctags'
-   elseif executable('ctags.exe')
-      let l:sCtagsName = 'ctags.exe'
-   elseif executable('tags')
-      let l:sCtagsName = 'tags'
-   endif
-
-   return l:sCtagsName
-
-endfunction
-
-function! <SID>IndexerGetCtagsVersion()
-
-   let l:dCtagsInfo = {'executable' : '', 'versionOutput' : '', 'boolCtagsExists' : 0, 'boolPatched' : 0, 'versionFirstLine' : ''}
-
-   let l:dCtagsInfo['executable'] = <SID>IndexerGetCtagsName()
-
-   if !empty(l:dCtagsInfo['executable'])
-      let l:dCtagsInfo['boolCtagsExists'] = 1
-
-      let l:dCtagsInfo['versionOutput'] = system(l:dCtagsInfo['executable']." --version")
-
-      if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vExuberant")) > 0
-
-         let l:dCtagsInfo['versionFirstLine'] = substitute(l:dCtagsInfo['versionOutput'], "\\v^([^\r\n]*).*$", "\\1", "g")
-
-         if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vdimon\\.frank\\@gmail\\.com")) > 0
-            let l:dCtagsInfo['boolPatched'] = 1
-         endif
-
-      endif
-   else
-      " if executable is empty, let's set it to "ctags", anyway.
-      let l:dCtagsInfo['executable'] = 'ctags'
-   endif
-
-   return l:dCtagsInfo
-
-endfunction
-
-function! <SID>Indexer_DetectCtags()
-   let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
-endfunction
-
 " ************************************************************************************************
 "                                   ASYNC COMMAND FUNCTIONS
 " ************************************************************************************************
@@ -753,6 +696,63 @@ endfunction
 " ************************************************************************************************
 "                                   CTAGS SPECIAL FUNCTIONS
 " ************************************************************************************************
+
+function! <SID>IndexerGetCtagsName()
+   " Location of the exuberant ctags tool_cmd
+   " (token from taglist plugin)
+
+   let l:sCtagsName = ''
+   if executable('ctags')
+      let l:sCtagsName = 'ctags'
+   elseif executable('exuberant-ctags')
+      " On Debian Linux, exuberant ctags is installed
+      " as exuberant-ctags
+      let l:sCtagsName = 'exuberant-ctags'
+   elseif executable('exctags')
+      " On Free-BSD, exuberant ctags is installed as exctags
+      let l:sCtagsName = 'exctags'
+   elseif executable('ctags.exe')
+      let l:sCtagsName = 'ctags.exe'
+   elseif executable('tags')
+      let l:sCtagsName = 'tags'
+   endif
+
+   return l:sCtagsName
+
+endfunction
+
+function! <SID>IndexerGetCtagsVersion()
+
+   let l:dCtagsInfo = {'executable' : '', 'versionOutput' : '', 'boolCtagsExists' : 0, 'boolPatched' : 0, 'versionFirstLine' : ''}
+
+   let l:dCtagsInfo['executable'] = <SID>IndexerGetCtagsName()
+
+   if !empty(l:dCtagsInfo['executable'])
+      let l:dCtagsInfo['boolCtagsExists'] = 1
+
+      let l:dCtagsInfo['versionOutput'] = system(l:dCtagsInfo['executable']." --version")
+
+      if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vExuberant")) > 0
+
+         let l:dCtagsInfo['versionFirstLine'] = substitute(l:dCtagsInfo['versionOutput'], "\\v^([^\r\n]*).*$", "\\1", "g")
+
+         if len(matchlist(l:dCtagsInfo['versionOutput'], "\\vdimon\\.frank\\@gmail\\.com")) > 0
+            let l:dCtagsInfo['boolPatched'] = 1
+         endif
+
+      endif
+   else
+      " if executable is empty, let's set it to "ctags", anyway.
+      let l:dCtagsInfo['executable'] = 'ctags'
+   endif
+
+   return l:dCtagsInfo
+
+endfunction
+
+function! <SID>Indexer_DetectCtags()
+   let s:dCtagsInfo = <SID>IndexerGetCtagsVersion()
+endfunction
 
 " update tags for one project.
 " 
