@@ -1639,6 +1639,8 @@ endfunction
 "                                             INIT
 " ************************************************************************************************
 
+let s:sIndexerVersion = '3.14'
+
 " --------- init variables --------
 if !exists('g:indexer_defaultSettingsFilename')
    let s:indexer_defaultSettingsFilename = ''
@@ -1702,7 +1704,9 @@ else
       exec ':silent echo ""'
       exec ':silent echo "**********************************************************************************************"'
       exec ':silent echo " Log opened."'
-      exec ':silent echo " Level: '.s:indexer_debugLogLevel.'."'
+      exec ':silent echo " Vim version: '.v:version.'"'
+      exec ':silent echo " Indexer version: '.s:sIndexerVersion.'"'
+      exec ':silent echo " Log level: '.s:indexer_debugLogLevel.'"'
       if exists("*strftime")
          exec ':silent echo " Time: '.strftime("%c").'"'
       endif
@@ -1710,7 +1714,6 @@ else
       exec ':silent echo ""'
       exec ':redir END'
    endif
-
 endif
 
 
@@ -1790,7 +1793,6 @@ if exists(':IndexerRebuild') != 2
 endif
 
 call <SID>Indexer_DetectCtags()
-let s:sIndexerVersion = '3.14'
 
 if empty(s:dCtagsInfo['boolCtagsExists'])
    echomsg "Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work."
