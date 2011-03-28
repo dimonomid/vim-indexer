@@ -16,6 +16,8 @@ to email me: dimon.frank@gmail.com
 
          Options.....................|indexer-options|
          Commands...................|indexer-commands|
+         Background...............|indexer-background|
+         Debug commands.......|indexer-debug-commands|
 
 You can use this plugin to automatically index your project files 
 using ctags. This can be very useful when it's used together with plugins
