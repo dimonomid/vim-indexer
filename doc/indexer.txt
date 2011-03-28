@@ -126,10 +126,13 @@ g:indexer_lookForProjectDir .
 Actually, Indexer sets &path for needed project when you swith to new 
 buffer, not only &tags.
 
-Please NOTE: tags generate in _background_ if only servername
+                                                         *indexer-background*
+Please NOTE: tags generate in background if only servername
 is not empty. (if you don't know what is servername, please read
-:help servername)
-If you use Gvim, then servername is not empty by default (if all is ok), 
+:help servername). Otherwise tags generate in Vim thread, and you need
+to wait while ctags work.
+
+If you use Gvim, then servername is "GVIM" by default (if all is ok), 
 and so, background tags generation should work in Gvim "out of the box".
 If you use console vim, you need to run vim somehow like that:
 
@@ -304,6 +307,34 @@ g:indexer_useSedWhenAppend (default: 1)
    version of sed, but there's other behavior, and so, this plugin may not 
    work properly with it.
 
+g:indexer_backgroundDisabled (default: 0)
+   
+  If 0 (by default), then tags generate in background (if possible. |indexer-background|)
+  If non-zero, then tags always generate in Vim thread. 
+
+  This option is added as a possible trouble-shoot. For instance, on Windows 7
+  there was some problems with background tags generation. These troubles
+  is solved in Indexer 3.14, but i don't know where i will face same 
+  troubles again =)
+
+g:indexer_debugLogLevel (default: 0)
+
+  debug log level.
+
+  Levels available:
+
+  0: log is disabled
+  1: operations with tags is logged
+  2: operations with projects is logged
+  3: all possible debug info is logged
+
+  You can see log by typing :IndexerDebugLog
+  You can save complete debug snapshot by typing :IndexerDebugSave
+
+g:indexer_debugLogFilename (default: "")
+
+  if not empty and if debug level > 0, then all log writes into this file.
+
 ========================================================================
 COMMANDS                                                  *indexer-commands*
 
@@ -313,7 +344,7 @@ COMMANDS                                                  *indexer-commands*
    using, files not found, and other.
 
    The first thing you should do if plugin doesn't work is type this command :)
-   
+
 :IndexerFiles
 
    prints list of indexed files
@@ -321,5 +352,24 @@ COMMANDS                                                  *indexer-commands*
 :IndexerRebuild
 
    rebuild tags for all files in project
+
+                                                          *indexer-debug-commands*
+:IndexerDebugLog
+
+   prints debug log.
+   Note: you need to specify log level by modifying variable g:indexer_debugLogLevel
+   Max log level is 3 (all info)
+   Min log level is 0 (log disabled. default)
+   
+:IndexerDebugSave
+
+   prompts for filename and saves debug snapshot to file.
+   
+:IndexerDebugInfo
+
+   prints some debug information. (Not very detailed at this moment)
+
+
+
 
  vim:ft=help:tw=78:  
