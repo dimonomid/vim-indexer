@@ -249,7 +249,7 @@ endfunction
 function! <SID>_AddToDebugLog(iLevel, sType, dData)
 
    if s:indexer_debugLogLevel >= a:iLevel
-      let l:dLogItem = {'type' : a:sType, 'data' : a:dData}
+      let l:dLogItem = {'level' : a:iLevel, 'type' : a:sType, 'data' : a:dData}
       call add(s:lDebug, l:dLogItem)
 
       " write log item to file, if file specified
@@ -262,16 +262,19 @@ endfunction
 
 function! <SID>_EchoLogItem(dLogItem)
    if exists("*strftime")
-      echo '* -------------------- '.strftime("%c").' --------------------*'
+      echo '* '.a:dLogItem["level"].' -------------------- '.strftime("%c").' --------------------*'
    else
-      echo '* -------------------- *'
+      echo '* '.a:dLogItem["level"].' -------------------- *'
    endif
-   echo 'type: '.a:dLogItem["type"].'; data:'
+   echo 'type: '.a:dLogItem["type"].';     data:'
    echo a:dLogItem["data"]
 endfunction
 
 function! <SID>IndexerDebugLog()
    if !empty(s:indexer_debugLogLevel)
+
+      echo " Log level: ".s:indexer_debugLogLevel
+      echo ""
 
       for l:dLogItem in s:lDebug
          call <SID>_EchoLogItem(l:dLogItem)
@@ -292,6 +295,42 @@ function! <SID>IndexerDebugInfo()
    echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
 endfunction
 
+
+function! <SID>IndexerDebugSave()
+
+   if empty(s:indexer_debugLogLevel)
+      echomsg "Warning: log is disabled. To enable, please define g:indexer_debugLogLevel > 0."
+   endif
+
+   let l:sFilename = input("Enter filename to save debug info: ")
+   if !empty(l:sFilename)
+
+      if filereadable(l:sFilename)
+         call delete(l:sFilename)
+      endif
+
+      if writefile(["VIM Indexer debug snapshot", ""], l:sFilename) != 0
+         call confirm("failed to write file: ".l:sFilename)
+      else
+
+         exec ':redir >> '.l:sFilename
+         silent echo ":version"
+         silent version
+         silent echo ""
+         silent echo ":IndexerInfo"
+         silent call <SID>IndexerInfo()
+         silent echo ""
+         silent echo ":IndexerDebugInfo"
+         silent call <SID>IndexerDebugInfo()
+         silent echo ""
+         silent echo ":IndexerDebugLog"
+         silent call <SID>IndexerDebugLog()
+         redir END
+         echomsg "debug snapshot saved successfully."
+      endif
+
+   endif
+endfunction
 
 
 " ************************************************************************************************
@@ -1784,6 +1823,9 @@ if exists(':IndexerDebugInfo') != 2
 endif
 if exists(':IndexerDebugLog') != 2
    command -nargs=? -complete=file IndexerDebugLog call <SID>IndexerDebugLog()
+endif
+if exists(':IndexerDebugSave') != 2
+   command -nargs=? -complete=file IndexerDebugSave call <SID>IndexerDebugSave()
 endif
 if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
