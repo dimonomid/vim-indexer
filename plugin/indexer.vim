@@ -449,6 +449,12 @@ function! <SID>NeedSkipBuffer(buf)
       return 1
    endif
 
+   if exists("s:curVimprjKey")
+      if expand(a:buf) == s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename
+         return 1
+      endif
+   endif
+
    "if empty(bufname(a:buf))
       "return 1
    "endif
