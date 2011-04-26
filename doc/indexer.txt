@@ -427,5 +427,6 @@ There's some people i'd like to say thanks for help with make Indexer better:
 * Dan Price
 * Thiago Bellini
 * Shi Haipend 
+* Alexander Pazdnikov
 
  vim:ft=help:tw=78:  

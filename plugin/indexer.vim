@@ -445,12 +445,20 @@ endfunction
 " returns if we should to skip this buffer ('skip' means not to generate tags
 " for it)
 function! <SID>NeedSkipBuffer(buf)
+
+   " &buftype should be empty for regular files
    if !empty(getbufvar(a:buf, "&buftype"))
       return 1
    endif
 
+   " skip standard .vimprojects file
+   if strpart(expand(a:buf), strlen(expand(a:buf))-12) == '.vimprojects'
+      return 1
+   endif
+
+   " skip specified projecs file (g:indexer_projectsSettingsFilename)
    if exists("s:curVimprjKey")
-      if expand(a:buf) == s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename
+      if expand(a:buf.":p") == s:dVimprjRoots[ s:curVimprjKey ].projectsSettingsFilename
          return 1
       endif
    endif
