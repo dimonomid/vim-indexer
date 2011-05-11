@@ -397,11 +397,22 @@ function! <SID>Indexer_ParseCommandOutput(sOutput)
 endfunction
 
 function! <SID>DeleteFile(filename)
-   call <SID>AddNewAsyncTask({'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : a:filename } })
+   call <SID>AddNewAsyncTask({
+            \     'mode' : 'AsyncModeDelete',
+            \     'data' : { 
+            \        'filename' : a:filename 
+            \     } 
+            \  })
 endfunction
 
 function! <SID>RenameFile(filename_old, filename_new)
-   call <SID>AddNewAsyncTask({'mode' : 'AsyncModeRename' , 'data' : { 'filename_old' : a:filename_old, 'filename_new' : a:filename_new } })
+   call <SID>AddNewAsyncTask({
+            \     'mode' : 'AsyncModeRename', 
+            \     'data' : { 
+            \        'filename_old' : a:filename_old,
+            \        'filename_new' : a:filename_new 
+            \     } 
+            \  })
 endfunction
 
 " applies all settings from .vimprj dir
@@ -677,7 +688,14 @@ function! <SID>IndexerInfo()
       else
          echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
       endif
-      echo '* At file save: '.(s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend ? 'remove tags for saved file by SED, and ' : '').'just append tags' : 'rebuild tags for whole project')
+      echo '* At file save: '.
+               \ (s:dVimprjRoots[ s:curVimprjKey ].ctagsJustAppendTagsAtFileSave 
+               \     ? (s:dVimprjRoots[ s:curVimprjKey ].useSedWhenAppend 
+               \           ? 'remove tags for saved file by SED, and ' 
+               \           : ''
+               \       ).'just append tags' 
+               \     : 'rebuild tags for whole project'
+               \ )
       if <SID>_IsBackgroundEnabled()
          echo '* Background tags generation: YES'
       else
@@ -696,7 +714,10 @@ function! <SID>IndexerInfo()
 
       echo '* Paths (with all subfolders): '.&path
       echo '* Tags file: '.&tags
-      echo '* Project root: '.($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found').'  (Project root is a directory which contains "'.s:indexer_dirNameForSearch.'" directory)'
+      echo '* Project root: '
+               \  .($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found')
+               \  .'  (Project root is a directory which contains "'
+               \  .s:indexer_dirNameForSearch.'" directory)'
    endif
 endfunction
 
