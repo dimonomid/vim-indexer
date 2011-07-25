@@ -2,7 +2,7 @@
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
 " Last Change: 24 Mar 2011
-" Version:     3.15 DEBUG
+" Version:     3.15
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -1149,17 +1149,15 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
 
                " -- now we should generate all subdirs
 
-               if 1
-                  " getting string with all subdirs
-                  let l:sDirs = expand(l:sTmpLine."/**/")
-                  " removing final slash at end of every dir
-                  let l:sDirs = substitute(l:sDirs, '\v[\\/](\n|$)', '\1', 'g')
-                  " getting list from string
-                  let l:lDirs = split(l:sDirs, '\n')
+               " getting string with all subdirs
+               let l:sDirs = expand(l:sTmpLine."/**/")
+               " removing final slash at end of every dir
+               let l:sDirs = substitute(l:sDirs, '\v[\\/](\n|$)', '\1', 'g')
+               " getting list from string
+               let l:lDirs = split(l:sDirs, '\n')
 
 
-                  let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lDirs)
-               endif
+               let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lDirs)
 
 
                if (!s:dVimprjRoots[ s:curVimprjKey ].useDirsInsteadOfFiles)
@@ -1716,7 +1714,7 @@ endfunction
 "                                             INIT
 " ************************************************************************************************
 
-let s:sIndexerVersion = '3.15 DEBUG'
+let s:sIndexerVersion = '3.15'
 
 " --------- init variables --------
 if !exists('g:indexer_defaultSettingsFilename')
