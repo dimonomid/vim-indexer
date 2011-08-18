@@ -2,7 +2,7 @@
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
 " Last Change: 24 Mar 2011
-" Version:     3.15
+" Version:     3.16
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -866,15 +866,15 @@ function! <SID>IndexerGetCtagsName()
    " (token from taglist plugin)
 
    let l:sCtagsName = ''
-   if executable('ctags')
-      let l:sCtagsName = 'ctags'
-   elseif executable('exuberant-ctags')
+   if executable('exuberant-ctags')
       " On Debian Linux, exuberant ctags is installed
       " as exuberant-ctags
       let l:sCtagsName = 'exuberant-ctags'
    elseif executable('exctags')
       " On Free-BSD, exuberant ctags is installed as exctags
       let l:sCtagsName = 'exctags'
+   elseif executable('ctags')
+      let l:sCtagsName = 'ctags'
    elseif executable('ctags.exe')
       let l:sCtagsName = 'ctags.exe'
    elseif executable('tags')
@@ -1714,7 +1714,7 @@ endfunction
 "                                             INIT
 " ************************************************************************************************
 
-let s:sIndexerVersion = '3.15'
+let s:sIndexerVersion = '3.16'
 
 " --------- init variables --------
 if !exists('g:indexer_defaultSettingsFilename')
