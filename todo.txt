@@ -1,8 +1,8 @@
-*) exctags and others before ctags
+-*) exctags and others before ctags
 
 *) create stable version
 
-*) create one more value for g:indexer_ctagsDontSpecifyFilesIfPossible: -1, or maybe 2, and make it default.
+-*) create one more value for g:indexer_ctagsDontSpecifyFilesIfPossible: -1, or maybe 2, and make it default.
    with this value, Indexer should behave with .vimprojects like value is 0, 
    and with .indexer_files like value is 1.
 
