@@ -1,6 +1,8 @@
+*) need to fix: if ctags becomes zombie just once, then indexer can't stop it and so it doesn't index anything until Vim is restarted. See todo/hgcommand.vim file - ctags becomes zombie if you try to generate tags for it
+
 -*) exctags and others before ctags
 
-*) create stable version
+-*) create stable version
 
 -*) create one more value for g:indexer_ctagsDontSpecifyFilesIfPossible: -1, or maybe 2, and make it default.
    with this value, Indexer should behave with .vimprojects like value is 0, 
