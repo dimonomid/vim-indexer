@@ -1,5 +1,8 @@
 *) need to fix: if ctags becomes zombie just once, then indexer can't stop it and so it doesn't index anything until Vim is restarted. See todo/hgcommand.vim file - ctags becomes zombie if you try to generate tags for it
 
+*) If indexer gives every filename to ctags, there could be better to use -L
+   key instead of put every filename to command
+
 -*) exctags and others before ctags
 
 -*) create stable version
