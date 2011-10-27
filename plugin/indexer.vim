@@ -337,6 +337,10 @@ endfunction
 "                                      ADDITIONAL FUNCTIONS
 " ************************************************************************************************
 
+function! <SID>_GetPathLastItem(sPath)
+   return substitute(a:sPath, '\v^.*[\\/]([^\\/]+)[\\/]{0,1}$', '\1', '')
+endfunction
+
 function! <SID>_UseDirsInsteadOfFiles(dVimprjRoot)
    if (a:dVimprjRoot.mode == 'IndexerFile')
       if (a:dVimprjRoot.useDirsInsteadOfFiles == 0)
@@ -1064,7 +1068,7 @@ endfunction
 " param dExistsResult уже существующий dictionary, к которому будут
 " добавлены полученные результаты
 "
-function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult)
+function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, projectName, dExistsResult)
    let l:aLines = a:aLines
    let l:dResult = a:dExistsResult
    let l:boolInNeededProject = (a:projectName == '' ? 1 : 0)
@@ -1082,23 +1086,51 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
          let l:myMatch = matchlist(l:sLine, '^\s*\[\([^\]]\+\)\]')
 
          if (len(l:myMatch) > 0)
+            " remember what is in []
+            let l:sProjName = l:myMatch[1]
 
             " check for PROJECTS_PARENT section
 
-            if (strpart(l:myMatch[1], 0, 15) == 'PROJECTS_PARENT')
+            if (strpart(l:sProjName, 0, 15) == 'PROJECTS_PARENT')
                " this is projects parent section
                let l:sProjectsParentFilter = ''
-               let filterMatch = matchlist(l:myMatch[1], 'filter="\([^"]\+\)"')
-               if (len(filterMatch) > 0)
-                  let l:sProjectsParentFilter = filterMatch[1]
+               let l:filterMatch = matchlist(l:sProjName, 'filter="\([^"]\+\)"')
+               if (len(l:filterMatch) > 0)
+                  let l:sProjectsParentFilter = l:filterMatch[1]
                endif
                let l:boolInProjectsParentSection = 1
             else
+               " this is usual project section.
+               " look if sProjName is like %blabla%
+               let l:sPatternTmpVar = '\v\%([^%]+)\%'
+
+               while (match(l:sProjName, l:sPatternTmpVar) >= 0)
+                  "echo "1"
+                  let l:tmpVarMatch = matchlist(l:sProjName, l:sPatternTmpVar)
+
+                  "if (l:tmpVarMatch[1] == 'dir_name(..)') "TODO: make more universal, not the hard '..'
+                  
+                  let l:dirNameMatch = matchlist(l:tmpVarMatch[1], '\vdir_name\(([^)]+)\)')
+                  if (len(l:dirNameMatch) > 0) "TODO: make more universal, not the hard '..'
+                     " get name of directory
+
+                     let l:sDirName = simplify(a:indexerFile.'/../'.l:dirNameMatch[1])
+                     let l:sDirName = <SID>_GetPathLastItem(l:sDirName)
+                     let l:sProjName = substitute(l:sProjName, l:sPatternTmpVar, l:sDirName, '')
+                  else
+                     let l:sProjName = substitute(l:sProjName, l:sPatternTmpVar, '_unknown_var_', '')
+                  endif
+               endwhile
+
+
+               " ---------------------
+
+
                let l:boolInProjectsParentSection = 0
 
 
                if (a:projectName != '')
-                  if (l:myMatch[1] == a:projectName)
+                  if (l:sProjName == a:projectName)
                      let l:boolInNeededProject = 1
                   else
                      let l:boolInNeededProject = 0
@@ -1106,7 +1138,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
                endif
 
                if l:boolInNeededProject
-                  let l:sCurProjName = l:myMatch[1]
+                  let l:sCurProjName = l:sProjName
                   let l:dResult[l:sCurProjName] = { 'files': [], 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
                endif
             endif
@@ -1135,7 +1167,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, projectName, dExistsResult
                   endif
                endfor
                " parsing this list
-               let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:projectName, l:dResult)
+               let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, a:projectName, l:dResult)
                
             elseif l:boolInNeededProject
                " looks like there's path
@@ -1207,7 +1239,7 @@ endfunction
 function! <SID>GetDirsAndFilesFromIndexerFile(indexerFile, projectName)
    let l:aLines = readfile(a:indexerFile)
    let l:dResult = {}
-   let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:aLines, a:projectName, l:dResult)
+   let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:aLines, a:indexerFile, a:projectName, l:dResult)
    return l:dResult
 endfunction
 
