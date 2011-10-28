@@ -476,7 +476,9 @@ function! <SID>ApplyVimprjSettings(sVimprjKey)
 
    for l:lFileProjs in s:dFiles[ s:curFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
-      exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
+      if s:dVimprjRoots[ a:sVimprjKey ]["handlePath"]
+         exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
+      endif
    endfor
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __ApplyVimprjSettings__', {})
@@ -572,6 +574,7 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
       let s:dVimprjRoots[a:sKey]["ctagsJustAppendTagsAtFileSave"] = g:indexer_ctagsJustAppendTagsAtFileSave
       let s:dVimprjRoots[a:sKey]["useDirsInsteadOfFiles"]         = g:indexer_ctagsDontSpecifyFilesIfPossible
       let s:dVimprjRoots[a:sKey]["backgroundDisabled"]            = g:indexer_backgroundDisabled
+      let s:dVimprjRoots[a:sKey]["handlePath"]                    = g:indexer_handlePath
       let s:dVimprjRoots[a:sKey]["mode"]                          = ""
 
       call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __AddNewVimprjRoot__', {})
@@ -581,7 +584,6 @@ endfunction
 
 function! <SID>SetDefaultIndexerOptions()
    let g:indexer_useSedWhenAppend                = s:def_useSedWhenAppend
-   let g:indexer_indexerListFilename             = s:def_indexerListFilename
    let g:indexer_projectsSettingsFilename        = s:def_projectsSettingsFilename
    let g:indexer_projectName                     = s:def_projectName
    let g:indexer_enableWhenProjectDirFound       = s:def_enableWhenProjectDirFound
@@ -589,6 +591,7 @@ function! <SID>SetDefaultIndexerOptions()
    let g:indexer_ctagsJustAppendTagsAtFileSave   = s:def_ctagsJustAppendTagsAtFileSave
    let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
    let g:indexer_backgroundDisabled              = s:def_backgroundDisabled
+   let g:indexer_handlePath                      = s:def_handlePath
 endfunction
 
 
@@ -1889,6 +1892,10 @@ if !exists('g:indexer_ctagsCommandLineOptions')
    let g:indexer_ctagsCommandLineOptions = '--c++-kinds=+p+l --fields=+iaS --extra=+q'
 endif
 
+if !exists('g:indexer_handlePath')
+   let g:indexer_handlePath = 1
+endif
+
 if !exists('g:indexer_ctagsJustAppendTagsAtFileSave')
    if (has('win32') || has('win64'))
       let g:indexer_ctagsJustAppendTagsAtFileSave = 0
@@ -1915,6 +1922,7 @@ let s:def_ctagsCommandLineOptions         = g:indexer_ctagsCommandLineOptions
 let s:def_ctagsJustAppendTagsAtFileSave   = g:indexer_ctagsJustAppendTagsAtFileSave
 let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPossible
 let s:def_backgroundDisabled              = g:indexer_backgroundDisabled
+let s:def_handlePath                      = g:indexer_handlePath
 
 " -------- init commands ---------
 
