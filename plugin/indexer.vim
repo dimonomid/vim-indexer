@@ -107,23 +107,28 @@ call vimprj#init()
 "                                          VIMPRJ HOOKS
 " ************************************************************************************************
 
-function! g:vimprj#dHooks['ApplyVimprjSettings_before']['indexer'](dParams)
-   let $INDEXER_PROJECT_ROOT = g:vimprj#dRoots[ a:dParams['sVimprjKey'] ].proj_root
+function! g:vimprj#dHooks['SourceVimprjFiles_before']['indexer'](dParams)
+
+   let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
 
    let &tags = s:sTagsDefault
    let &path = s:sPathDefault
 
 endfunction
 
-function! g:vimprj#dHooks['ApplyVimprjSettings_after']['indexer'](dParams)
-   " для каждого проекта, в который входит файл, добавляем tags и path
-
-   for l:lFileProjs in g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]
+function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
+   for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
-      if g:vimprj#dRoots[ a:dParams['sVimprjKey'] ]['indexer']["handlePath"]
+      if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
          exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
       endif
    endfor
+endfunction
+
+function! g:vimprj#dHooks['ApplyVimprjSettings_after']['indexer'](dParams)
+   " для каждого проекта, в который входит файл, добавляем tags и path
+
+   call <SID>SetTagsAndPath(g:vimprj#iCurFileNum, a:dParams['sVimprjKey'])
 
 endfunction
 
@@ -149,6 +154,18 @@ function! g:vimprj#dHooks['NeedSkipBuffer']['indexer'](dParams)
 
 endfunction
 
+" Этот хук запускается, когда открыт новый файл.
+"
+" К тому времени, как этот хук запускается, плагин vimprj
+" уже сделал следующее:
+"     ищем директорию .vimprj
+"     если нашли, то:
+"        запускаем хук SetDefaultOptions
+"        выполняем все *.vim файлы из .vimprj
+"        меняем текущую директорию
+"        если этой директории .vimprj еще нет в нашей базе,
+"           то добавляем ее туда (хук OnAddNewVimprjRoot)
+"
 function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    "function! <SID>OnFileOpen()
 
@@ -156,19 +173,33 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    " смотрим: еще не парсили этот файл? (dProjFilesParsed)
    "    парсим
    " endif
-   if (filereadable(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].indexerListFilename))
-      " read all projects from proj file
-      let l:sProjFilename = g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].indexerListFilename
-      let g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode = 'IndexerFile'
 
-   elseif (filereadable(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].projectsSettingsFilename))
+   "let l:sVimprjKey = g:vimprj#sCurVimprjKey
+
+   "let l:sVimprjKey = a:dParams['sVimprjKey']
+   "let l:iFileNum   = a:dParams['iFileNum']
+
+
+   let l:sVimprjKey = g:vimprj#sCurVimprjKey
+   let l:iFileNum   = g:vimprj#iCurFileNum
+
+   " $INDEXER_PROJECT_ROOT can appear in .vimprojects or .indexer_files.
+   " we should define it
+   let $INDEXER_PROJECT_ROOT = g:vimprj#dRoots[ l:sVimprjKey ].proj_root
+
+   if (filereadable(g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].indexerListFilename))
+      " read all projects from proj file
+      let l:sProjFilename = g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].indexerListFilename
+      let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].mode = 'IndexerFile'
+
+   elseif (filereadable(g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].projectsSettingsFilename))
       " read all projects from indexer file
-      let l:sProjFilename = g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].projectsSettingsFilename
-      let g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode = 'ProjectFile'
+      let l:sProjFilename = g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].projectsSettingsFilename
+      let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].mode = 'ProjectFile'
 
    else
       let l:sProjFilename = ''
-      let g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode = ''
+      let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].mode = ''
    endif
 
    let l:sProjFileKey = <SID>GetKeyFromPath(l:sProjFilename)
@@ -176,7 +207,12 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    if (l:sProjFileKey != "") " если нашли файл с описанием проектов
       if (!exists("s:dProjFilesParsed['".l:sProjFileKey."']"))
          " если этот файл еще не обрабатывали
-         let s:dProjFilesParsed[ l:sProjFileKey ] = {"filename" : l:sProjFilename, "type" : g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode, "sVimprjKey" : g:vimprj#sCurVimprjKey, "projects" : {} }
+         let s:dProjFilesParsed[ l:sProjFileKey ] = {
+                     \     "filename"   : l:sProjFilename,
+                     \     "type"       : g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].mode,
+                     \     "sVimprjKey" : l:sVimprjKey,
+                     \     "projects"   : {},
+                     \  }
 
          call <SID>ParseProjectSettingsFile(l:sProjFileKey)
 
@@ -220,12 +256,12 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
       "                  проекта, но не перечислена явно в файле проекта.
       "
       "
-      if (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].projectName == '')
+      if (g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].projectName == '')
          " пользователь не указал явно название проекта. Нам нужно выяснять.
 
          let l:iProjectsAddedCnt = 0
          let l:lProjects = []
-         if (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].enableWhenProjectDirFound || <SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
+         if (g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].enableWhenProjectDirFound || <SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ l:sVimprjKey ]['indexer']))
             " режим директорий
             for l:sCurProjName in keys(s:dProjFilesParsed[ l:sProjFileKey ]["projects"])
                let l:boolFound = 0
@@ -238,7 +274,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                      " We should add it to result lists
 
                      if l:iProjectsAddedCnt == 0
-                        call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName)
+                        call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName, l:iFileNum)
                      endif
                      let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                      call add(l:lProjects, l:sCurProjName)
@@ -263,7 +299,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                   " result lists
 
                   if l:iProjectsAddedCnt == 0
-                     call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName)
+                     call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName, l:iFileNum)
                   endif
                   let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                   call add(l:lProjects, l:sCurProjName)
@@ -281,8 +317,8 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
       else    " if projectName != ""
          " пользователь явно указал проект, который нужно проиндексировать
          for l:sCurProjName in keys(s:dProjFilesParsed[ l:sProjFileKey ]["projects"])
-            if (l:sCurProjName == g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].projectName)
-               call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName)
+            if (l:sCurProjName == g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].projectName)
+               call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName, l:iFileNum)
             endif
          endfor
 
@@ -291,7 +327,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
       " теперь запускаем ctags для каждого непроиндексированного проекта, 
       " в который входит файл
-      for l:sCurProj in g:vimprj#dFiles[ g:vimprj#iCurFileNum ].projects
+      for l:sCurProj in g:vimprj#dFiles[ l:iFileNum ].projects
          if (!s:dProjFilesParsed[ l:sCurProj.file ]["projects"][ l:sCurProj.name ].boolIndexed)
             " генерим теги
             call <SID>UpdateTagsForProject(l:sCurProj.file, l:sCurProj.name, "")
@@ -303,7 +339,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
    endif " if l:sProjFileKey != ""
 
-
+   call <SID>SetTagsAndPath(l:iFileNum, l:sVimprjKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
@@ -677,8 +713,8 @@ function! <SID>RenameFile(filename_old, filename_new)
             \  })
 endfunction
 
-function! <SID>AddNewProjectToCurFile(sProjFileKey, sProjName)
-   call add(g:vimprj#dFiles[ g:vimprj#iCurFileNum ].projects, {"file" : a:sProjFileKey, "name" : a:sProjName})
+function! <SID>AddNewProjectToCurFile(sProjFileKey, sProjName, iFileNum)
+   call add(g:vimprj#dFiles[ a:iFileNum ].projects, {"file" : a:sProjFileKey, "name" : a:sProjName})
 endfunction
 
 function! <SID>GetKeyFromPath(sPath)
@@ -690,7 +726,13 @@ function! <SID>IndexerFilesList()
       echo "option g:indexer_ctagsDontSpecifyFilesIfPossible is ON. So, Indexer knows nothing about files."
    else
       if len(g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]) > 0
-         echo "* Files indexed: ".join( s:dProjFilesParsed[ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["file"] ][ "projects" ][ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["name"] ]["files"] )
+         echo "* Files indexed: ".join(
+                     \  s:dProjFilesParsed 
+                     \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["file"] ]
+                     \      [ "projects" ]
+                     \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["name"] ]
+                     \      ["files"] 
+                     \  )
       else
          echo "There's no projects indexed."
       endif
@@ -879,6 +921,8 @@ function! <SID>GetCtagsCommand(dParams)
    " tags file becomes damaged because of Sed's output is always with UNIX
    " line-ends. Ctags at Windows fails with this file.
    "
+   "TODO: убрать отсюда g:vimprj#sCurVimprjKey и т.д., передавать опции типа
+   "ctagsJustAppendTagsAtFileSave в параметрах
    if (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave && g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].useSedWhenAppend && (has('win32') || has('win64')))
       let l:sSortCode = '--sort=no'
    else
@@ -1064,6 +1108,7 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile)
 
       if (!empty(a:sSavedFile) && filereadable(l:sTagsFile))
          " just appending tags from just saved file. (from one file!)
+         " TODO: разобраться как убрать отсюда g:vimprj#sCurVimprjKey
          if (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].useSedWhenAppend)
             call <SID>ExecSed({'sTagsFile': l:sTagsFile, 'sFilenameToDeleteTagsWith': a:sSavedFile})
          endif
@@ -1156,6 +1201,8 @@ endfunction
 "
 " параметры:                             
 " param aLines все строки файла (т.е. файл надо сначала прочитать)
+" param indexerFile имя файла (используется только для того, чтобы распарсить
+" названия проектов типа [%dir_name(..)%])
 " param projectName название проекта, который нужно прочитать.
 "                   если пустой, то будут прочитаны
 "                   все проекты из файла
@@ -1202,10 +1249,8 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, projectName, 
                   "echo "1"
                   let l:tmpVarMatch = matchlist(l:sProjName, l:sPatternTmpVar)
 
-                  "if (l:tmpVarMatch[1] == 'dir_name(..)') "TODO: make more universal, not the hard '..'
-                  
                   let l:dirNameMatch = matchlist(l:tmpVarMatch[1], '\vdir_name\(([^)]+)\)')
-                  if (len(l:dirNameMatch) > 0) "TODO: make more universal, not the hard '..'
+                  if (len(l:dirNameMatch) > 0)
                      " get name of directory
 
                      let l:sDirName = simplify(a:indexerFile.'/../'.l:dirNameMatch[1])
@@ -1273,18 +1318,29 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, projectName, 
                " we should separately expand every variable
                " like $BLABLABLA
                let l:sPatt = "\\v(\\$[a-zA-Z0-9_]+)"
+               let l:sUnknownPrefix = '-=UNKNOWN=-'
                while (1)
                   let l:varMatch = matchlist(l:sLine, l:sPatt)
                   " if there's any $BLABLA in string
                   if (len(l:varMatch) > 0)
+                     let l:sValue = expand(l:varMatch[1])
+
+                     if l:sValue == l:varMatch[1]
+                        " unknown variable
+                        call confirm('Indexer warning: unknown variable in '.a:indexerFile.': '.l:sValue)
+                        let l:sValue = substitute(l:sValue, '\V$', l:sUnknownPrefix, '')
+                     endif
+
                      " changing one slash in value to doubleslash
-                     let l:sTmp = substitute(expand(l:varMatch[1]), "\\\\", "\\\\\\\\", "g")
+                     let l:sValue = substitute(l:sValue, "\\\\", "\\\\\\\\", "g")
                      " changing $BLABLA to its value (doubleslashed)
-                     let l:sLine = substitute(l:sLine, l:sPatt, l:sTmp, "")
+                     let l:sLine = substitute(l:sLine, l:sPatt, l:sValue, "")
                   else 
                      break
                   endif
                endwhile
+
+               let l:sLine = substitute(l:sLine, '\V'.l:sUnknownPrefix, '$', 'g')
 
 
                let l:sTmpLine = l:sLine
@@ -1311,6 +1367,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, projectName, 
                let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lDirs)
 
 
+               " TODO: разобраться как убрать отсюда g:vimprj#sCurVimprjKey
                if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
                   " adding every file.
                   let l:dResult[l:sCurProjName].files = <SID>ConcatLists(l:dResult[l:sCurProjName].files, split(expand(substitute(<SID>Trim(l:sLine), '\\\*\*', '**', 'g')), '\n'))
@@ -1425,6 +1482,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, projectName)
       endwhile
 
       " searching for filename (if there's files-mode, not dir-mode)
+      " TODO: разобраться как убрать отсюда g:vimprj#sCurVimprjKey
       if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
          if (l:sLine =~ '^[^={}]*$' && l:sLine !~ '^\s*$')
             " here we found something like filename
@@ -1461,6 +1519,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, projectName)
 endfunction
 
 
+" parse file .vimprojects or .indexer_files
 function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __ParseProjectSettingsFile__', {'filename' : s:dProjFilesParsed[ a:sProjFileKey ]["filename"]})
@@ -1468,8 +1527,14 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
    " HACK!
    let l:bufVimprjKey = g:vimprj#sCurVimprjKey
    let g:vimprj#sCurVimprjKey = s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"]
-   call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
-   "call g:vimprj#dHooks['ApplyVimprjSettings']['indexer']({'sVimprjKey' : g:vimprj#sCurVimprjKey})
+
+   if (l:bufVimprjKey != g:vimprj#sCurVimprjKey)
+      call confirm("sVimprjKey different. bufVimprjKey: ".l:bufVimprjKey.', g:vimprj#sCurVimprjKey: '.g:vimprj#sCurVimprjKey)
+      call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+   endif
+   "call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+   "call g:vimprj#dHooks['ApplyVimprjSettings_before']['indexer']({'sVimprjKey' : g:vimprj#sCurVimprjKey})
+   "call g:vimprj#dHooks['ApplyVimprjSettings_after']['indexer']({'sVimprjKey' : g:vimprj#sCurVimprjKey})
 
    if (s:dProjFilesParsed[ a:sProjFileKey ]["type"] == 'IndexerFile')
       let s:dProjFilesParsed[a:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromIndexerFile(s:dProjFilesParsed[ a:sProjFileKey ]["filename"], g:vimprj#dRoots[ s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"] ]['indexer'].projectName)
@@ -1477,8 +1542,10 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
       let s:dProjFilesParsed[a:sProjFileKey]["projects"] = <SID>GetDirsAndFilesFromProjectFile(s:dProjFilesParsed[ a:sProjFileKey ]["filename"], g:vimprj#dRoots[ s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"] ]['indexer'].projectName)
    endif
 
-   let g:vimprj#sCurVimprjKey = l:bufVimprjKey
-   call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+   if (l:bufVimprjKey != g:vimprj#sCurVimprjKey)
+      let g:vimprj#sCurVimprjKey = l:bufVimprjKey
+      call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+   endif
    "call g:vimprj#dHooks['ApplyVimprjSettings']['indexer']({'sVimprjKey' : g:vimprj#sCurVimprjKey})
 
    " для каждого проекта из файла с описанием проектов
@@ -1536,13 +1603,13 @@ endfunction
 "
 " param a:sFile - string like '%' or '<afile>' or something like that.
 " 
-function! <SID>UpdateTagsForFile(sFile, boolJustAppendTags)
+function! <SID>UpdateTagsForFile(sFile, boolJustAppendTags, iFileNum)
    let l:sSavedFile = <SID>ParsePath(expand(a:sFile.':p'))
    "let l:sSavedFilePath = <SID>ParsePath(expand('%:p:h'))
 
    " для каждого проекта, в который входит файл, ...
 
-   for l:lFileProjs in g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]
+   for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       let l:dCurProject = s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]
 
       " if saved file is present in non-existing filelist then moving file from non-existing list to existing list
@@ -1569,7 +1636,11 @@ endfunction
 
 function! <SID>OnBufSave()
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnBufSave__', {'filename' : expand('<afile>')})
-   call <SID>UpdateTagsForFile( '<afile>', g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave )
+   call <SID>UpdateTagsForFile(
+            \     '<afile>',
+            \     g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave,
+            \     g:vimprj#iCurFileNum
+            \  )
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
 
@@ -1767,7 +1838,7 @@ if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
 if exists(':IndexerRebuild') != 2
-   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%', 0)
+   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%', 0, g:vimprj#iCurFileNum)
 endif
 
 call <SID>Indexer_DetectCtags()
