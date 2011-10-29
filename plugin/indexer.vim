@@ -109,7 +109,9 @@ call vimprj#init()
 
 function! g:vimprj#dHooks['SourceVimprjFiles_before']['indexer'](dParams)
 
-   let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
+   if !empty(a:dParams['sDirName'])
+      let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
+   endif
 
    let &tags = s:sTagsDefault
    let &path = s:sPathDefault
@@ -1547,7 +1549,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
    let l:sVimprjKey = s:dProjFilesParsed[ a:sProjFileKey ]["sVimprjKey"]
    if (l:sVimprjKey != g:vimprj#sCurVimprjKey)
-      call ApplyVimprjSettings(l:sVimprjKey)
+      call vimprj#applyVimprjSettings(l:sVimprjKey)
    endif
 
    " HACK!
@@ -1579,7 +1581,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
    endif
 
    if (l:sVimprjKey != g:vimprj#sCurVimprjKey)
-      call ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
    endif
 
    "if (l:bufVimprjKey != g:vimprj#sCurVimprjKey)
