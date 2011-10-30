@@ -150,6 +150,9 @@ endfunction
 function! g:vimprj#dHooks['ApplyVimprjSettings_after']['indexer'](dParams)
    " для каждого проекта, в который входит файл, добавляем tags и path
 
+   " TODO: убрать g:vimprj#iCurFileNum. 
+   " Может, хотя бы просто сделать так, чтобы vimprj передавал тот же vimprj#iCurFileNum,
+   " но тогда это уже будет на совести vimprj.
    call <SID>SetTagsAndPath(g:vimprj#iCurFileNum, a:dParams['sVimprjKey'])
 
 endfunction
@@ -941,8 +944,6 @@ function! <SID>GetCtagsCommand(dParams)
    " tags file becomes damaged because of Sed's output is always with UNIX
    " line-ends. Ctags at Windows fails with this file.
    "
-   "TODO: убрать отсюда g:vimprj#sCurVimprjKey и т.д., передавать опции типа
-   "ctagsJustAppendTagsAtFileSave в параметрах
    if (a:dParams['dIndexerParams'].ctagsJustAppendTagsAtFileSave && a:dParams['dIndexerParams'].useSedWhenAppend && (has('win32') || has('win64')))
       let l:sSortCode = '--sort=no'
    else
