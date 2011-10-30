@@ -127,17 +127,6 @@ let g:loaded_indexer  = 1
 "                                          VIMPRJ HOOKS
 " ************************************************************************************************
 
-function! g:vimprj#dHooks['SourceVimprjFiles_before']['indexer'](dParams)
-
-   if !empty(a:dParams['sDirName'])
-      let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
-   endif
-
-   let &tags = s:sTagsDefault
-   let &path = s:sPathDefault
-
-endfunction
-
 function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
@@ -397,6 +386,14 @@ function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
    let g:indexer_backgroundDisabled              = s:def_backgroundDisabled
    let g:indexer_handlePath                      = s:def_handlePath
+
+   if !empty(a:dParams['sDirName'])
+      let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
+   endif
+
+   let &tags = s:sTagsDefault
+   let &path = s:sPathDefault
+
 endfunction
 
 
