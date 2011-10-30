@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     3.18
+" Version:     4.00
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -101,7 +101,27 @@
 "        
 "  
 
-call vimprj#init()
+if v:version < 700
+   call confirm("indexer error: You need Vim 7.0 or higher")
+   finish
+endif
+
+try
+   call vimprj#init()
+catch
+   " no vimprj plugin installed
+endtry
+
+let s:iVimprj_min_version = 100
+
+if !exists("vimprj#version") || vimprj#version < s:iVimprj_min_version
+   call confirm("indexer error: you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
+   finish
+endif
+
+let g:iIndexerVersion = 400
+let g:loaded_indexer  = 1
+
 
 " ************************************************************************************************
 "                                          VIMPRJ HOOKS
@@ -176,14 +196,11 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    "    парсим
    " endif
 
+   let l:sVimprjKey = a:dParams['sVimprjKey']
+   let l:iFileNum   = a:dParams['iFileNum']
+
    "let l:sVimprjKey = g:vimprj#sCurVimprjKey
-
-   "let l:sVimprjKey = a:dParams['sVimprjKey']
-   "let l:iFileNum   = a:dParams['iFileNum']
-
-
-   let l:sVimprjKey = g:vimprj#sCurVimprjKey
-   let l:iFileNum   = g:vimprj#iCurFileNum
+   "let l:iFileNum   = g:vimprj#iCurFileNum
 
    " $INDEXER_PROJECT_ROOT can appear in .vimprojects or .indexer_files.
    " we should define it
@@ -833,7 +850,8 @@ function! <SID>IndexerInfo()
 
    call <SID>Indexer_DetectCtags()
 
-   echo '* Indexer version: '.s:sIndexerVersion
+   let l:iVersionStrlen = strlen(g:iIndexerVersion)
+   echo '* Indexer version: '.strpart(g:iIndexerVersion, 0, l:iVersionStrlen - 2).'.'.strpart(g:iIndexerVersion, l:iVersionStrlen - 2)
 
    if empty(s:dCtagsInfo['boolCtagsExists'])
       echo '* Error: Ctags NOT FOUND. You need to install Exuberant Ctags to make Indexer work. The better way is to install patched ctags: http://dfrank.ru/ctags581/en.html'
@@ -1720,8 +1738,6 @@ endfunction
 "                                             INIT
 " ************************************************************************************************
 
-let s:sIndexerVersion = '3.18'
-
 " --------- init variables --------
 "if !exists('g:indexer_defaultSettingsFilename')
    "let s:indexer_defaultSettingsFilename = ''
@@ -1786,7 +1802,7 @@ else
       exec ':silent echo "**********************************************************************************************"'
       exec ':silent echo " Log opened."'
       exec ':silent echo " Vim version: '.v:version.'"'
-      exec ':silent echo " Indexer version: '.s:sIndexerVersion.'"'
+      exec ':silent echo " Indexer version: '.g:iIndexerVersion.'"'
       exec ':silent echo " Log level: '.s:indexer_debugLogLevel.'"'
       if exists("*strftime")
          exec ':silent echo " Time: '.strftime("%c").'"'
