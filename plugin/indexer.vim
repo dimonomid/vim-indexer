@@ -1154,7 +1154,7 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile, dIndexe
                   \     'recursive': 0,
                   \     'sTagsFile': l:sTagsFile,
                   \     'sFiles': a:sSavedFile,
-                  \     'dIndexerParams' : a:dParams.dIndexerParams
+                  \     'dIndexerParams' : a:dIndexerParams
                   \  })
 
       else
