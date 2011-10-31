@@ -1,10 +1,28 @@
+
 *) add option to not to modify &path
 
 *) include projects.
 For instance, in module/old/.vimprj/appl/.vimprj/.indexer_files i'd like to
 define something like that:
 
-INCLUDE_PROJECT = ../../../lib/mc/ecan
+[Module_old]
+$INDEXER_PROJECT_ROOT\**\*.[ch]
+INCLUDE_PROJECT = vimprj(../../../lib/mc/ecan)
+
+or:
+
+[Module_old]
+$INDEXER_PROJECT_ROOT\**\*.[ch]
+INCLUDE_PROJECT = vimprj(../../../lib/mc/ecan), project_name(ecan)
+
+or:
+
+[Module_old]
+$INDEXER_PROJECT_ROOT\**\*.[ch]
+INCLUDE_PROJECT = project_name(some_another_project)
+
+[some_another_project]
+some_path/**/*.[ch]
 
 
 *) need to fix: if ctags becomes zombie just once, then indexer can't stop it and so it doesn't index anything until Vim is restarted. See todo/hgcommand.vim file - ctags becomes zombie if you try to generate tags for it
