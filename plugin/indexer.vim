@@ -136,18 +136,16 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
    endfor
 endfunction
 
-function! g:vimprj#dHooks['ApplyVimprjSettings_after']['indexer'](dParams)
+function! g:vimprj#dHooks['ApplySettingsForFile']['indexer'](dParams)
    " для каждого проекта, в который входит файл, добавляем tags и path
+   let l:sVimprjKey = vimprj#getVimprjKeyOfFile( a:dParams['iFileNum'] )
 
-   " TODO: убрать g:vimprj#iCurFileNum. 
-   " Может, хотя бы просто сделать так, чтобы vimprj передавал тот же g:vimprj#iCurFileNum,
-   " но тогда это уже будет на совести vimprj.
-   call <SID>SetTagsAndPath(a:dParams['iFileNum'], a:dParams['sVimprjKey'])
+   call <SID>SetTagsAndPath(a:dParams['iFileNum'], l:sVimprjKey)
 
 endfunction
 
 function! g:vimprj#dHooks['OnAddFile']['indexer'](dParams)
-   let g:vimprj#dFiles[ a:dParams['iBufNum'] ]['projects'] = []
+   let g:vimprj#dFiles[ a:dParams['iFileNum'] ]['projects'] = []
 endfunction
 
 function! g:vimprj#dHooks['NeedSkipBuffer']['indexer'](dParams)
@@ -188,7 +186,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    "    парсим
    " endif
 
-   let l:sVimprjKey = a:dParams['sVimprjKey']
+   let l:sVimprjKey = vimprj#getVimprjKeyOfFile( a:dParams['iFileNum'] )
    let l:iFileNum   = a:dParams['iFileNum']
 
    "let l:sVimprjKey = g:vimprj#sCurVimprjKey
@@ -358,7 +356,7 @@ endfunction
 " добавляет новый vimprj root, заполняет его текущими параметрами
 function! g:vimprj#dHooks['OnAddNewVimprjRoot']['indexer'](dParams)
 
-   let l:sVimprjKey = a:dParams['sKey']
+   let l:sVimprjKey = a:dParams['sVimprjKey']
 
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'] = {}
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useSedWhenAppend"]              = g:indexer_useSedWhenAppend
@@ -387,8 +385,8 @@ function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let g:indexer_backgroundDisabled              = s:def_backgroundDisabled
    let g:indexer_handlePath                      = s:def_handlePath
 
-   if !empty(a:dParams['sDirName'])
-      let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sDirName'].'/..')
+   if !empty(a:dParams['sVimprjDirName'])
+      let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sVimprjDirName'].'/..')
    endif
 
    let &tags = s:sTagsDefault
@@ -1204,8 +1202,8 @@ function! <SID>UpdateTagsForEveryNeededProjectFromFile(sProjFileKey)
 
    " searching for all currently indexed projects from given projects file
    " (we should re-index them all)
-   for l:iBufNum in keys(g:vimprj#dFiles)
-      for l:dProjectFile in g:vimprj#dFiles[ l:iBufNum ]["projects"]
+   for l:iFileNum in keys(g:vimprj#dFiles)
+      for l:dProjectFile in g:vimprj#dFiles[ l:iFileNum ]["projects"]
          if (l:dProjectFile["file"] == a:sProjFileKey && index(l:lProjects, l:dProjectFile["name"]) == -1)
             call add(l:lProjects, l:dProjectFile["name"])
          endif
