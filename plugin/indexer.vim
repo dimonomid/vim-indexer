@@ -149,7 +149,7 @@ function! g:vimprj#dHooks['OnAddFile']['indexer'](dParams)
 endfunction
 
 function! g:vimprj#dHooks['NeedSkipBuffer']['indexer'](dParams)
-   let l:sFilename = bufname(a:dParams['iFileNum'])
+   let l:sFilename = <SID>BufName(a:dParams['iFileNum'])
    " skip standard .vimprojects file
    if strpart(l:sFilename, strlen(l:sFilename)-12) == '.vimprojects'
       return 1
@@ -394,6 +394,21 @@ function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let &tags = s:sTagsDefault
    let &path = s:sPathDefault
 
+endfunction
+
+function! g:vimprj#dHooks['OnBufSave']['indexer'](dParams)
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnBufSave__', {'filename' : expand('<afile>')})
+
+   let l:iFileNum = a:dParams['iFileNum']
+
+   call <SID>UpdateTagsForFile(l:iFileNum)
+
+   "call <SID>UpdateTagsForFile(
+   "\     '<afile>',
+   "\     g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave,
+   "\     g:vimprj#iCurFileNum
+   "\  )
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
 
 
@@ -814,6 +829,15 @@ function! <SID>IsAbsolutePath(path)
    endif
    return 0
 endfunction " >>>
+
+function! <SID>BufName(mValue)
+   let l:sFilename = bufname(a:mValue)
+   if !empty(l:sFilename) && !<SID>IsAbsolutePath(l:sFilename)
+      let l:sFilename = getcwd().'/'.l:sFilename
+   endif
+
+   return l:sFilename
+endfunction
 
 " returns whether or not file exists in list
 function! <SID>IsFileExistsInList(aList, sFilename)
@@ -1663,13 +1687,16 @@ endfunction
 "
 " param a:sFile - string like '%' or '<afile>' or something like that.
 " 
-function! <SID>UpdateTagsForFile(sFile)
+function! <SID>UpdateTagsForFile(iFileNum)
 
-   let l:iFileNum           = bufnr(expand(a:sFile))
+   let l:iFileNum           = a:iFileNum
    let l:sVimprjKey         = g:vimprj#dFiles[ l:iFileNum ]['sVimprjKey']
    let l:boolJustAppendTags = g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave
 
-   let l:sSavedFile = <SID>ParsePath(expand(a:sFile.':p'))
+
+   "let l:sSavedFile = <SID>ParsePath(expand(a:sFile.':p'))
+   let l:sSavedFile = <SID>BufName(l:iFileNum)
+
    "let l:sSavedFilePath = <SID>ParsePath(expand('%:p:h'))
 
 
@@ -1699,19 +1726,6 @@ endfunction
 " ************************************************************************************************
 "                    EVENT HANDLERS (OnBufSave, OnBufEnter, OnFileOpen)
 " ************************************************************************************************
-
-function! <SID>OnBufSave()
-   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnBufSave__', {'filename' : expand('<afile>')})
-
-   call <SID>UpdateTagsForFile('<afile>')
-
-   "call <SID>UpdateTagsForFile(
-            "\     '<afile>',
-            "\     g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave,
-            "\     g:vimprj#iCurFileNum
-            "\  )
-   call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
-endfunction
 
 
 
@@ -1910,7 +1924,7 @@ if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
 if exists(':IndexerRebuild') != 2
-   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile('%')
+   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile(bufnr('%'))
 endif
 
 call <SID>Indexer_DetectCtags()
@@ -1944,7 +1958,7 @@ let s:sPathDefault = &path
 " задаем пустые массивы с данными
 let s:dProjFilesParsed = {}
 
-autocmd BufWritePost * call <SID>OnBufSave()
+"autocmd BufWritePost * call <SID>OnBufSave()
 
 
 
