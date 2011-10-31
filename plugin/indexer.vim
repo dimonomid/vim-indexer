@@ -112,14 +112,14 @@ catch
    " no vimprj plugin installed
 endtry
 
-let s:iVimprj_min_version = 100
+let s:iVimprj_min_version = 101
 
-if !exists("vimprj#version") || vimprj#version < s:iVimprj_min_version
+if !exists("g:vimprj#version") || g:vimprj#version < s:iVimprj_min_version
    call confirm("indexer error: you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
    finish
 endif
 
-let g:iIndexerVersion = 400
+let g:iIndexerVersion = 402
 let g:loaded_indexer  = 1
 
 
@@ -359,31 +359,33 @@ function! g:vimprj#dHooks['OnAddNewVimprjRoot']['indexer'](dParams)
    let l:sVimprjKey = a:dParams['sVimprjKey']
 
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'] = {}
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useSedWhenAppend"]              = g:indexer_useSedWhenAppend
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["indexerListFilename"]           = g:indexer_indexerListFilename
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectsSettingsFilename"]      = g:indexer_projectsSettingsFilename
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectName"]                   = g:indexer_projectName
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["enableWhenProjectDirFound"]     = g:indexer_enableWhenProjectDirFound
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["ctagsCommandLineOptions"]       = g:indexer_ctagsCommandLineOptions
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["ctagsJustAppendTagsAtFileSave"] = g:indexer_ctagsJustAppendTagsAtFileSave
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useDirsInsteadOfFiles"]         = g:indexer_ctagsDontSpecifyFilesIfPossible
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["backgroundDisabled"]            = g:indexer_backgroundDisabled
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["handlePath"]                    = g:indexer_handlePath
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["mode"]                          = ""
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useSedWhenAppend"]                 = g:indexer_useSedWhenAppend
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["indexerListFilename"]              = g:indexer_indexerListFilename
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectsSettingsFilename"]         = g:indexer_projectsSettingsFilename
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectName"]                      = g:indexer_projectName
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["enableWhenProjectDirFound"]        = g:indexer_enableWhenProjectDirFound
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["ctagsCommandLineOptions"]          = g:indexer_ctagsCommandLineOptions
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["ctagsJustAppendTagsAtFileSave"]    = g:indexer_ctagsJustAppendTagsAtFileSave
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useDirsInsteadOfFiles"]            = g:indexer_ctagsDontSpecifyFilesIfPossible
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["backgroundDisabled"]               = g:indexer_backgroundDisabled
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["handlePath"]                       = g:indexer_handlePath
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["mode"]                             = ""
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["getAllSubdirsFromIndexerListFile"] = g:indexer_getAllSubdirsFromIndexerListFile
 
 endfunction
 
 
 function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
-   let g:indexer_useSedWhenAppend                = s:def_useSedWhenAppend
-   let g:indexer_projectsSettingsFilename        = s:def_projectsSettingsFilename
-   let g:indexer_projectName                     = s:def_projectName
-   let g:indexer_enableWhenProjectDirFound       = s:def_enableWhenProjectDirFound
-   let g:indexer_ctagsCommandLineOptions         = s:def_ctagsCommandLineOptions
-   let g:indexer_ctagsJustAppendTagsAtFileSave   = s:def_ctagsJustAppendTagsAtFileSave
-   let g:indexer_ctagsDontSpecifyFilesIfPossible = s:def_ctagsDontSpecifyFilesIfPossible
-   let g:indexer_backgroundDisabled              = s:def_backgroundDisabled
-   let g:indexer_handlePath                      = s:def_handlePath
+   let g:indexer_useSedWhenAppend                 = s:def_useSedWhenAppend
+   let g:indexer_projectsSettingsFilename         = s:def_projectsSettingsFilename
+   let g:indexer_projectName                      = s:def_projectName
+   let g:indexer_enableWhenProjectDirFound        = s:def_enableWhenProjectDirFound
+   let g:indexer_ctagsCommandLineOptions          = s:def_ctagsCommandLineOptions
+   let g:indexer_ctagsJustAppendTagsAtFileSave    = s:def_ctagsJustAppendTagsAtFileSave
+   let g:indexer_ctagsDontSpecifyFilesIfPossible  = s:def_ctagsDontSpecifyFilesIfPossible
+   let g:indexer_backgroundDisabled               = s:def_backgroundDisabled
+   let g:indexer_handlePath                       = s:def_handlePath
+   let g:indexer_getAllSubdirsFromIndexerListFile = s:def_getAllSubdirsFromIndexerListFile
 
    if !empty(a:dParams['sVimprjDirName'])
       let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sVimprjDirName'].'/..')
@@ -1394,17 +1396,26 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                let l:dResult[l:sCurProjName].pathsRoot = <SID>ConcatLists(l:dResult[l:sCurProjName].pathsRoot, [<SID>ParsePath(l:sTmpLine)])
                let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, [<SID>ParsePath(l:sTmpLine)])
 
+
+
                " -- now we should generate all subdirs
+               "    (if g:indexer_getAllSubdirsFromIndexerListFile is on)
 
-               " getting string with all subdirs
-               let l:sDirs = expand(l:sTmpLine."/**/")
-               " removing final slash at end of every dir
-               let l:sDirs = substitute(l:sDirs, '\v[\\/](\n|$)', '\1', 'g')
-               " getting list from string
-               let l:lDirs = split(l:sDirs, '\n')
+               let l:lSubPaths = []
+
+               if a:dIndexerParams['getAllSubdirsFromIndexerListFile']
+                  " getting string with all subdirs
+                  let l:sSubPaths = expand(l:sTmpLine."/**/")
+                  " removing final slash at end of every dir
+                  let l:sSubPaths = substitute(l:sSubPaths, '\v[\\/](\n|$)', '\1', 'g')
+                  " getting list from string
+                  let l:lSubPaths = split(l:sSubPaths, '\n')
+               endif
+
+               
 
 
-               let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lDirs)
+               let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lSubPaths)
 
 
                if (!<SID>_UseDirsInsteadOfFiles(a:dIndexerParams))
@@ -1858,17 +1869,22 @@ if !exists('g:indexer_backgroundDisabled')
    let g:indexer_backgroundDisabled = 0
 endif
 
+if !exists('g:indexer_getAllSubdirsFromIndexerListFile')
+   let g:indexer_getAllSubdirsFromIndexerListFile = 0
+endif
 
-let s:def_useSedWhenAppend                = g:indexer_useSedWhenAppend
-let s:def_indexerListFilename             = g:indexer_indexerListFilename
-let s:def_projectsSettingsFilename        = g:indexer_projectsSettingsFilename
-let s:def_projectName                     = g:indexer_projectName
-let s:def_enableWhenProjectDirFound       = g:indexer_enableWhenProjectDirFound
-let s:def_ctagsCommandLineOptions         = g:indexer_ctagsCommandLineOptions
-let s:def_ctagsJustAppendTagsAtFileSave   = g:indexer_ctagsJustAppendTagsAtFileSave
-let s:def_ctagsDontSpecifyFilesIfPossible = g:indexer_ctagsDontSpecifyFilesIfPossible
-let s:def_backgroundDisabled              = g:indexer_backgroundDisabled
-let s:def_handlePath                      = g:indexer_handlePath
+
+let s:def_useSedWhenAppend                  = g:indexer_useSedWhenAppend
+let s:def_indexerListFilename               = g:indexer_indexerListFilename
+let s:def_projectsSettingsFilename          = g:indexer_projectsSettingsFilename
+let s:def_projectName                       = g:indexer_projectName
+let s:def_enableWhenProjectDirFound         = g:indexer_enableWhenProjectDirFound
+let s:def_ctagsCommandLineOptions           = g:indexer_ctagsCommandLineOptions
+let s:def_ctagsJustAppendTagsAtFileSave     = g:indexer_ctagsJustAppendTagsAtFileSave
+let s:def_ctagsDontSpecifyFilesIfPossible   = g:indexer_ctagsDontSpecifyFilesIfPossible
+let s:def_backgroundDisabled                = g:indexer_backgroundDisabled
+let s:def_handlePath                        = g:indexer_handlePath
+let s:def_getAllSubdirsFromIndexerListFile  = g:indexer_getAllSubdirsFromIndexerListFile
 
 " -------- init commands ---------
 
@@ -1923,4 +1939,9 @@ let s:sPathDefault = &path
 let s:dProjFilesParsed = {}
 
 autocmd BufWritePost * call <SID>OnBufSave()
+
+
+
+
+let g:indexer_dProjFilesParsed = s:dProjFilesParsed
 
