@@ -408,7 +408,7 @@ endfunction
 " ------------------ next 2 functions is directly from asynccommand.vim ---------------------
 
 " Basic background task running is different on each platform
-if has("win32")
+if has("win32") || has("win64")
    " Works in Windows (Win7 x64)
    function! <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
       let l:cmd = a:tool_cmd
@@ -739,7 +739,13 @@ function! <SID>AddNewProjectToCurFile(sProjFileKey, sProjName, iFileNum)
 endfunction
 
 function! <SID>GetKeyFromPath(sPath)
-   return substitute(a:sPath, '[^a-zA-Z0-9_]', '_', 'g')
+   let l:sKey = substitute(a:sPath, '[^a-zA-Z0-9_]', '_', 'g')
+
+   if has('win32') || has('win64')
+      let l:sKey = tolower(l:sKey)
+   endif
+
+   return l:sKey
 endfunction
 
 function! <SID>IndexerFilesList()
