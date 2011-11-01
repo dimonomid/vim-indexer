@@ -144,7 +144,7 @@ function! g:vimprj#dHooks['ApplySettingsForFile']['indexer'](dParams)
 
 endfunction
 
-function! g:vimprj#dHooks['OnAddFile']['indexer'](dParams)
+function! g:vimprj#dHooks['OnTakeAccountOfFile']['indexer'](dParams)
    let g:vimprj#dFiles[ a:dParams['iFileNum'] ]['projects'] = []
 endfunction
 
