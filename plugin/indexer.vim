@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     4.03
+" Version:     4.04
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -112,14 +112,14 @@ catch
    " no vimprj plugin installed
 endtry
 
-let s:iVimprj_min_version = 101
+let s:iVimprj_min_version = 102
 
 if !exists("g:vimprj#version") || g:vimprj#version < s:iVimprj_min_version
    call confirm("indexer error: you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
    finish
 endif
 
-let g:iIndexerVersion = 403
+let g:iIndexerVersion = 404
 let g:loaded_indexer  = 1
 
 
