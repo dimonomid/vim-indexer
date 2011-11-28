@@ -1,3 +1,5 @@
+*) если в директории PROJECTS_PARENT что-то поменялось, то для применения изменений нужно перезапускать Vim. Нужно сделать, чтобы перезапуск не требовался
+
 *) refactor NeedSkipBuffer: it should not affect main Vimprj's NeedSkipBuffer.
 
 *) add option to not to modify &path
