@@ -64,6 +64,22 @@
 "        ["sVimprjKey"] - key for g:vimprj#dRoots
 "
 "
+"
+" s:sLastCtagsCmd    - last executed ctags command
+" s:sLastCtagsOutput - output for last executed ctags command
+"
+" s:dCtagsInfo - DICTIONARY
+"     ["executable"] - name of executable. For example, "ctags" or
+"                      "ctags.exe", etc
+"     ["versionOutput"] - output for ctags --version
+"     ["boolCtagsExists"] - if ctags is found, then 1. Otherwise 0.
+"     ["boolPatched"] - if version ctags is patched by Dmitry Frank, then 1.
+"                       Otherwise 0.
+"     ["versionFirstLine"] - output for ctags --version, but first line only.
+"
+"
+" TODO: move this description to vimprj plugin
+"
 " g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
 "     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY KEY
 "        ["cd_path"] - path for CD. Can't be empty.
@@ -85,18 +101,6 @@
 "              ["file"] - key for s:dProjFilesParsed
 "              ["name"] - name of project
 "           
-" s:sLastCtagsCmd    - last executed ctags command
-" s:sLastCtagsOutput - output for last executed ctags command
-"
-" s:dCtagsInfo - DICTIONARY
-"     ["executable"] - name of executable. For example, "ctags" or
-"                      "ctags.exe", etc
-"     ["versionOutput"] - output for ctags --version
-"     ["boolCtagsExists"] - if ctags is found, then 1. Otherwise 0.
-"     ["boolPatched"] - if version ctags is patched by Dmitry Frank, then 1.
-"                       Otherwise 0.
-"     ["versionFirstLine"] - output for ctags --version, but first line only.
-"
 
 "        
 "  
