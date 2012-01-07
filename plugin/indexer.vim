@@ -115,7 +115,7 @@ endtry
 let s:iVimprj_min_version = 102
 
 if !exists("g:vimprj#version") || g:vimprj#version < s:iVimprj_min_version
-   call confirm("indexer error: you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
+   call confirm("Indexer error: since Indexer version 4.0 you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
    finish
 endif
 
