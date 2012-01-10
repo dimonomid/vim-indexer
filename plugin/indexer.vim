@@ -200,20 +200,48 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    " we should define it
    let $INDEXER_PROJECT_ROOT = g:vimprj#dRoots[ l:sVimprjKey ].proj_root
 
-   if (filereadable(a:dParams['dVimprjRootParams'].indexerListFilename))
+
+
+
+
+   let l:sVimprjDirName = g:vimprj#dRoots[ l:sVimprjKey ].path
+   let l:iLen = strlen(l:sVimprjDirName)
+
+   let l:boolPreferIndexerFile = (strpart(a:dParams['dVimprjRootParams'].indexerListFilename,      0, l:iLen) == l:sVimprjDirName)
+   let l:boolPreferProjectFile = (strpart(a:dParams['dVimprjRootParams'].projectsSettingsFilename, 0, l:iLen) == l:sVimprjDirName)
+
+   if !empty(l:sVimprjDirName)
+            \  && filereadable(a:dParams['dVimprjRootParams'].indexerListFilename)
+            \  && filereadable(a:dParams['dVimprjRootParams'].projectsSettingsFilename)
+            \  && (!l:boolPreferIndexerFile || !l:boolPreferProjectFile)
+            \  && ( l:boolPreferIndexerFile ||  l:boolPreferProjectFile)
+
+      if l:boolPreferIndexerFile
+         let a:dParams['dVimprjRootParams'].mode = 'IndexerFile'
+      elseif l:boolPreferProjectFile
+         let a:dParams['dVimprjRootParams'].mode = 'ProjectFile'
+      endif
+
+   elseif (filereadable(a:dParams['dVimprjRootParams'].indexerListFilename))
       " read all projects from proj file
-      let l:sProjFilename = a:dParams['dVimprjRootParams'].indexerListFilename
       let a:dParams['dVimprjRootParams'].mode = 'IndexerFile'
 
    elseif (filereadable(a:dParams['dVimprjRootParams'].projectsSettingsFilename))
       " read all projects from indexer file
-      let l:sProjFilename = a:dParams['dVimprjRootParams'].projectsSettingsFilename
       let a:dParams['dVimprjRootParams'].mode = 'ProjectFile'
 
    else
-      let l:sProjFilename = ''
       let a:dParams['dVimprjRootParams'].mode = ''
    endif
+
+   if     a:dParams['dVimprjRootParams'].mode == 'IndexerFile'
+      let l:sProjFilename = a:dParams['dVimprjRootParams'].indexerListFilename
+   elseif a:dParams['dVimprjRootParams'].mode == 'ProjectFile'
+      let l:sProjFilename = a:dParams['dVimprjRootParams'].projectsSettingsFilename
+   else
+      let l:sProjFilename = ''
+   endif
+
 
    let l:sProjFileKey = <SID>GetKeyFromPath(l:sProjFilename)
 
@@ -373,6 +401,7 @@ function! g:vimprj#dHooks['OnAddNewVimprjRoot']['indexer'](dParams)
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useDirsInsteadOfFiles"]            = g:indexer_ctagsDontSpecifyFilesIfPossible
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["backgroundDisabled"]               = g:indexer_backgroundDisabled
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["handlePath"]                       = g:indexer_handlePath
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["ctagsWriteFilelist"]               = g:indexer_ctagsWriteFilelist
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["mode"]                             = ""
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["getAllSubdirsFromIndexerListFile"] = g:indexer_getAllSubdirsFromIndexerListFile
 
@@ -390,6 +419,7 @@ function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let g:indexer_backgroundDisabled               = s:def_backgroundDisabled
    let g:indexer_handlePath                       = s:def_handlePath
    let g:indexer_getAllSubdirsFromIndexerListFile = s:def_getAllSubdirsFromIndexerListFile
+   let g:indexer_ctagsWriteFilelist               = s:def_ctagsWriteFilelist
 
    if !empty(a:dParams['sVimprjDirName'])
       let $INDEXER_PROJECT_ROOT = simplify(a:dParams['sVimprjDirName'].'/..')
@@ -953,14 +983,20 @@ endfunction
 " generates command to call ctags apparently params.
 " params:
 "   dParams {
-"      append,    // 1 or 0
-"      recursive, // 1 or 0
-"      sTagsFile, // ".."
-"      sFiles,    // ".."
+"      append,          // 1 or 0
+"      recursive,       // 1 or 0
+"      sTagsFile,       // ".." - filename to save tags.
+"                                 Will be passed to ctags with -f key.
+"      sFiles,          // ".." - just string with filenames to be indexed.
+"                                 Will be passed to ctags literally.
+"      sFilelistFile,   // ".." - file with list of files to be indexed. 
+"                                 Will be passed to ctags with -L key.
+"      dIndexerParams,  // g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
 "   }
 function! <SID>GetCtagsCommand(dParams)
    let l:sAppendCode = ''
    let l:sRecurseCode = ''
+   let l:sFilelistFileCode = ''
 
    if (a:dParams.append)
       let l:sAppendCode = '-a'
@@ -968,6 +1004,11 @@ function! <SID>GetCtagsCommand(dParams)
 
    if (a:dParams.recursive)
       let l:sRecurseCode = '-R'
+   endif
+
+
+   if has_key(a:dParams, 'sFilelistFile') && !empty(a:dParams.sFilelistFile)
+      let l:sFilelistFileCode = '-L "'.a:dParams.sFilelistFile.'"'
    endif
 
    " when using append without Sed we SHOULD use sort, because of if there's no sort, then
@@ -984,7 +1025,14 @@ function! <SID>GetCtagsCommand(dParams)
    endif
 
    let l:sTagsFile = '"'.a:dParams.sTagsFile.'"'
-   let l:sCmd = s:dCtagsInfo['executable'].' -f '.l:sTagsFile.' '.l:sRecurseCode.' '.l:sAppendCode.' '.l:sSortCode.' '.a:dParams['dIndexerParams'].ctagsCommandLineOptions.' '.a:dParams.sFiles
+   let l:sCmd = s:dCtagsInfo['executable']
+            \  .' -f '.l:sTagsFile.' '
+            \  .l:sRecurseCode.' '
+            \  .l:sAppendCode.' '
+            \  .l:sSortCode.' '
+            \  .l:sFilelistFileCode.' '
+            \  .a:dParams['dIndexerParams'].ctagsCommandLineOptions.' '
+            \  .a:dParams.sFiles
 
    return l:sCmd
 endfunction
@@ -1008,25 +1056,59 @@ endfunction
 "   }
 function! <SID>ExecCtagsForListOfFiles(dParams)
 
-   " we need to know length of command to call ctags (without any files)
-   let l:sCmd = <SID>GetCtagsCommand({
-            \     'append'         : 1,
-            \     'recursive'      : a:dParams.recursive,
-            \     'sTagsFile'      : a:dParams.sTagsFile,
-            \     'sFiles'         : "",
-            \     'dIndexerParams' : a:dParams.dIndexerParams
-            \  })
-   let l:iCmdLen = strlen(l:sCmd)
+   if len(a:dParams.lFilelist) > 2 && a:dParams.dIndexerParams['ctagsWriteFilelist']
+      " write filelist and pass it to ctags with -L key
+      let l:sFilelistFilename = a:dParams.sTagsFile."_files"
+
+      " TODO: check if writefile succeed, and if not, then run 'usual'
+      " scenario to build tags
+      call writefile(a:dParams.lFilelist, l:sFilelistFilename)
+
+      call <SID>ExecCtags({
+               \     'append'         : 0,
+               \     'recursive'      : a:dParams.recursive,
+               \     'sTagsFile'      : a:dParams.sTagsFile,
+               \     'sFilelistFile'  : l:sFilelistFilename,
+               \     'sFiles'         : '',
+               \     'dIndexerParams' : a:dParams.dIndexerParams
+               \  })
+      
+   else
+      " specify filenames (or dirnames) directly in command line to ctags
+
+      " we need to know length of command to call ctags (without any files)
+      let l:sCmd = <SID>GetCtagsCommand({
+               \     'append'         : 1,
+               \     'recursive'      : a:dParams.recursive,
+               \     'sTagsFile'      : a:dParams.sTagsFile,
+               \     'sFiles'         : "",
+               \     'dIndexerParams' : a:dParams.dIndexerParams
+               \  })
+      let l:iCmdLen = strlen(l:sCmd)
 
 
-   " now enumerating files
-   let l:sFiles = ''
-   for l:sCurFile in a:dParams.lFilelist
+      " now enumerating file
+      let l:sFiles = ''
+      for l:sCurFile in a:dParams.lFilelist
 
-      let l:sCurFile = <SID>ParsePath(l:sCurFile)
-      " if command with next file will be too long, then executing command
-      " BEFORE than appending next file to list
-      if ((strlen(l:sFiles) + strlen(l:sCurFile) + l:iCmdLen) > s:indexer_maxOSCommandLen)
+         let l:sCurFile = <SID>ParsePath(l:sCurFile)
+         " if command with next file will be too long, then executing command
+         " BEFORE than appending next file to list
+         if ((strlen(l:sFiles) + strlen(l:sCurFile) + l:iCmdLen) > s:indexer_maxOSCommandLen)
+            call <SID>ExecCtags({
+                     \     'append': 1,
+                     \     'recursive'      : a:dParams.recursive,
+                     \     'sTagsFile'      : a:dParams.sTagsFile,
+                     \     'sFiles'         : l:sFiles,
+                     \     'dIndexerParams' : a:dParams.dIndexerParams
+                     \  })
+            let l:sFiles = ''
+         endif
+
+         let l:sFiles = l:sFiles.' "'.l:sCurFile.'"'
+      endfor
+
+      if (l:sFiles != '')
          call <SID>ExecCtags({
                   \     'append': 1,
                   \     'recursive'      : a:dParams.recursive,
@@ -1034,22 +1116,9 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                   \     'sFiles'         : l:sFiles,
                   \     'dIndexerParams' : a:dParams.dIndexerParams
                   \  })
-         let l:sFiles = ''
       endif
 
-      let l:sFiles = l:sFiles.' "'.l:sCurFile.'"'
-   endfor
-
-   if (l:sFiles != '')
-      call <SID>ExecCtags({
-               \     'append': 1,
-               \     'recursive'      : a:dParams.recursive,
-               \     'sTagsFile'      : a:dParams.sTagsFile,
-               \     'sFiles'         : l:sFiles,
-               \     'dIndexerParams' : a:dParams.dIndexerParams
-               \  })
    endif
-
 
 endfunction
 
@@ -1897,6 +1966,10 @@ if !exists('g:indexer_getAllSubdirsFromIndexerListFile')
    let g:indexer_getAllSubdirsFromIndexerListFile = 0
 endif
 
+if !exists('g:indexer_ctagsWriteFilelist')
+   let g:indexer_ctagsWriteFilelist = 1
+endif
+
 
 let s:def_useSedWhenAppend                  = g:indexer_useSedWhenAppend
 let s:def_indexerListFilename               = g:indexer_indexerListFilename
@@ -1906,6 +1979,7 @@ let s:def_enableWhenProjectDirFound         = g:indexer_enableWhenProjectDirFoun
 let s:def_ctagsCommandLineOptions           = g:indexer_ctagsCommandLineOptions
 let s:def_ctagsJustAppendTagsAtFileSave     = g:indexer_ctagsJustAppendTagsAtFileSave
 let s:def_ctagsDontSpecifyFilesIfPossible   = g:indexer_ctagsDontSpecifyFilesIfPossible
+let s:def_ctagsWriteFilelist                = g:indexer_ctagsWriteFilelist
 let s:def_backgroundDisabled                = g:indexer_backgroundDisabled
 let s:def_handlePath                        = g:indexer_handlePath
 let s:def_getAllSubdirsFromIndexerListFile  = g:indexer_getAllSubdirsFromIndexerListFile

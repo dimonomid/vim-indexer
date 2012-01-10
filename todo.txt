@@ -1,6 +1,10 @@
-*) если в директории PROJECTS_PARENT что-то поменялось, то для применения изменений нужно перезапускать Vim. Нужно сделать, чтобы перезапуск не требовался
+*) when .vimprojects is used, and some file is added to project, then it appears in tags just when saved SECOND time, not first.
 
-*) refactor NeedSkipBuffer: it should not affect main Vimprj's NeedSkipBuffer.
+*) if FILES mode, when .indexer_files is used, we need to refresh all wildcards at every tags rebuild.
+   (when tags is rebuilded at every filesave - then we need to refresh all wildcards at every filesave)
+
+*) добавить в доки описание приоритета .indexer_files или .vimprojects если один из них находится в .vimprj, а другой нет
+*) если в директории PROJECTS_PARENT что-то поменялось, то для применения изменений нужно перезапускать Vim. Нужно сделать, чтобы перезапуск не требовался
 
 *) add option to not to modify &path
 
@@ -30,8 +34,8 @@ some_path/**/*.[ch]
 
 *) need to fix: if ctags becomes zombie just once, then indexer can't stop it and so it doesn't index anything until Vim is restarted. See todo/hgcommand.vim file - ctags becomes zombie if you try to generate tags for it
 
-*) If indexer gives every filename to ctags, there could be better to use -L
-   key instead of put every filename to command
+-*) If indexer gives every filename to ctags, there could be better to use -L
+    key instead of put every filename to command
 
 -*) exctags and others before ctags
 
@@ -40,4 +44,7 @@ some_path/**/*.[ch]
 -*) create one more value for g:indexer_ctagsDontSpecifyFilesIfPossible: -1, or maybe 2, and make it default.
    with this value, Indexer should behave with .vimprojects like value is 0, 
    and with .indexer_files like value is 1.
+
+-*) добавить явное указание режима: .indexer_files или .vimprojects. 
+   потому что сейчас есть проблема: если в .vimprj указать .vimprojects файл, а в домашней директории лежит .indexer_files, то будет использоваться именно .indexer_files, а это плохо.
 
