@@ -252,11 +252,11 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
       if (!exists("s:dProjFilesParsed['".l:sProjFileKey."']"))
          " если этот файл еще не обрабатывали
          let s:dProjFilesParsed[ l:sProjFileKey ] = {
-                     \     "filename"   : l:sProjFilename,
-                     \     "type"       : a:dParams['dVimprjRootParams'].mode,
-                     \     "sVimprjKey" : l:sVimprjKey,
-                     \     "projects"   : {},
-                     \  }
+                  \     "filename"   : l:sProjFilename,
+                  \     "type"       : a:dParams['dVimprjRootParams'].mode,
+                  \     "sVimprjKey" : l:sVimprjKey,
+                  \     "projects"   : {},
+                  \  }
 
          call <SID>ParseProjectSettingsFile(l:sProjFileKey)
 
@@ -801,12 +801,12 @@ function! <SID>IndexerFilesList()
    else
       if len(g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]) > 0
          echo "* Files indexed: ".join(
-                     \  s:dProjFilesParsed 
-                     \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["file"] ]
-                     \      [ "projects" ]
-                     \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["name"] ]
-                     \      ["files"] 
-                     \  )
+                  \  s:dProjFilesParsed 
+                  \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["file"] ]
+                  \      [ "projects" ]
+                  \      [ g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"][0]["name"] ]
+                  \      ["files"] 
+                  \  )
       else
          echo "There's no projects indexed."
       endif
@@ -905,7 +905,7 @@ function! <SID>IndexerInfo()
       let l:sPathsRoot .= join(l:dCurProject.pathsRoot, ', ')
 
       if !empty(l:sPathsForCtags)
-          let l:sPathsForCtags .= ", "
+         let l:sPathsForCtags .= ", "
       endif
       let l:sPathsForCtags .= join(l:dCurProject.pathsForCtags, ', ')
       let l:iFilesCnt += len(l:dCurProject.files)
@@ -922,7 +922,7 @@ function! <SID>IndexerInfo()
       echo '* Error: Ctags NOT FOUND. You need to install Exuberant Ctags to make Indexer work. The better way is to install patched ctags: http://dfrank.ru/ctags581/en.html'
    else
       echo '* Ctags version: '.s:dCtagsInfo['versionFirstLine']
-      
+
       if (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode == '')
          echo '* Filelist: not found'
       elseif (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].mode == 'IndexerFile')
@@ -971,9 +971,9 @@ function! <SID>IndexerInfo()
 
       "TODO
       "echo '* Project root: '
-               "\  .($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found')
-               "\  .'  (Project root is a directory which contains "'
-               "\  .s:indexer_dirNameForSearch.'" directory)'
+      "\  .($INDEXER_PROJECT_ROOT != '' ? $INDEXER_PROJECT_ROOT : 'not found')
+      "\  .'  (Project root is a directory which contains "'
+      "\  .s:indexer_dirNameForSearch.'" directory)'
    endif
 endfunction
 
@@ -1085,7 +1085,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                \     'sAddParams'     : a:dParams.sAddParams,
                \     'dIndexerParams' : a:dParams.dIndexerParams
                \  })
-      
+
    endif
 
    if len(a:dParams.lFilelist) > 0
@@ -1171,9 +1171,9 @@ function! <SID>ExecSed(dParams)
 
 
    "if exists("*AsyncCommand")
-      "call AsyncCommand(l:sCmd, "")
+   "call AsyncCommand(l:sCmd, "")
    "else
-      "let l:resp = system(l:sCmd)
+   "let l:resp = system(l:sCmd)
    "endif
 
 endfunction
@@ -1254,7 +1254,7 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile, dIndexe
    if empty(s:dCtagsInfo['boolCtagsExists'])
       call <SID>Indexer_DetectCtags()
    endif
-   
+
    if !empty(s:dCtagsInfo['boolCtagsExists'])
       let l:sTagsFile = s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename
       let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ a:sProjName ]
@@ -1397,6 +1397,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
    let l:sProjectsParentFilter = ''
 
    let l:sCurProjName = ''
+   let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
 
    for l:sLine in l:aLines
 
@@ -1463,41 +1464,50 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
             endif
          else
 
-            if l:boolInProjectsParentSection
-               " parsing one project parent
+            " look for options
+            "        option:my_cool_option = "cool value"
+            let l:myMatch = matchlist(l:sLine, l:sPattern_option)
 
-               let l:lFilter = split(l:sProjectsParentFilter, ' ')
-               if (len(l:lFilter) == 0)
-                  let l:lFilter = ['*']
-               endif
-               " removing \/* from end of path
-               let l:projectsParent = substitute(<SID>Trim(l:sLine), '[\\/*]\+$', '', '')
-
-               " creating list of projects
-               let l:lProjects = split(expand(l:projectsParent.'/*'), '\n')
-               let l:lIndexerFilesList = []
-               for l:sPrj in l:lProjects
-                  if (isdirectory(l:sPrj))
-                     call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
-                     for l:sCurFilter in l:lFilter
-                        call add(l:lIndexerFilesList, l:sPrj.'/**/'.l:sCurFilter)
-                     endfor
-                     call add(l:lIndexerFilesList, '')
-                  endif
-               endfor
-               " parsing this list
-               let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, l:dResult, a:dIndexerParams)
-               
-            elseif l:boolInNeededProject
-
-               " look for options
-               "        option:my_cool_option = "cool value"
-               let l:myMatch = matchlist(l:sLine, '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"')
-
-               if (len(l:myMatch) > 0)
-                  " this is an option
+            if (len(l:myMatch) > 0)
+               if l:boolInProjectsParentSection
+                  " OPTION in parsing one project parent
+                  " TODO
+               elseif l:boolInNeededProject
+                  " OPTION in usual project
                   let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
-               else
+               endif
+            else
+
+               if l:boolInProjectsParentSection
+                  " parsing one project parent
+
+                  let l:lFilter = split(l:sProjectsParentFilter, ' ')
+                  if (len(l:lFilter) == 0)
+                     let l:lFilter = ['*']
+                  endif
+                  " removing \/* from end of path
+                  let l:projectsParent = substitute(<SID>Trim(l:sLine), '[\\/*]\+$', '', '')
+
+                  " creating list of projects
+                  let l:lProjects = split(expand(l:projectsParent.'/*'), '\n')
+                  let l:lIndexerFilesList = []
+                  for l:sPrj in l:lProjects
+                     if (isdirectory(l:sPrj))
+                        call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
+                        for l:sCurFilter in l:lFilter
+                           call add(l:lIndexerFilesList, l:sPrj.'/**/'.l:sCurFilter)
+                        endfor
+                        call add(l:lIndexerFilesList, '')
+                     endif
+                  endfor
+                  " parsing this list
+                  let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, l:dResult, a:dIndexerParams)
+
+               elseif l:boolInNeededProject
+
+                  " look for options
+                  "        option:my_cool_option = "cool value"
+                  let l:myMatch = matchlist(l:sLine, l:sPattern_option)
 
                   " looks like there's path
                   if l:sCurProjName == ''
@@ -1757,7 +1767,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, dIndexerParams)
       for l:sKey in keys(l:dResult)
          let l:dResult[l:sKey].pathsForCtags = l:dResult[l:sKey].pathsRoot
       endfor
-      
+
    endif
 
    return l:dResult
@@ -1955,27 +1965,27 @@ endfunction
 
 " --------- init variables --------
 "if !exists('g:indexer_defaultSettingsFilename')
-   "let s:indexer_defaultSettingsFilename = ''
+"let s:indexer_defaultSettingsFilename = ''
 "else
-   "let s:indexer_defaultSettingsFilename = g:indexer_defaultSettingsFilename
+"let s:indexer_defaultSettingsFilename = g:indexer_defaultSettingsFilename
 "endif
 
 "if !exists('g:indexer_lookForProjectDir')
-   "let s:indexer_lookForProjectDir = 1
+"let s:indexer_lookForProjectDir = 1
 "else
-   "let s:indexer_lookForProjectDir = g:indexer_lookForProjectDir
+"let s:indexer_lookForProjectDir = g:indexer_lookForProjectDir
 "endif
 
 "if !exists('g:indexer_dirNameForSearch')
-   "let s:indexer_dirNameForSearch = '.vimprj'
+"let s:indexer_dirNameForSearch = '.vimprj'
 "else
-   "let s:indexer_dirNameForSearch = g:indexer_dirNameForSearch
+"let s:indexer_dirNameForSearch = g:indexer_dirNameForSearch
 "endif
 
 "if !exists('g:indexer_recurseUpCount')
-   "let s:indexer_recurseUpCount = 10
+"let s:indexer_recurseUpCount = 10
 "else
-   "let s:indexer_recurseUpCount = g:indexer_recurseUpCount
+"let s:indexer_recurseUpCount = g:indexer_recurseUpCount
 "endif
 
 if !exists('g:indexer_tagsDirname')
@@ -2029,9 +2039,9 @@ else
 endif
 
 "if !exists('g:indexer_changeCurDirIfVimprjFound')
-   "let s:indexer_changeCurDirIfVimprjFound = 1
+"let s:indexer_changeCurDirIfVimprjFound = 1
 "else
-   "let s:indexer_changeCurDirIfVimprjFound = g:indexer_changeCurDirIfVimprjFound
+"let s:indexer_changeCurDirIfVimprjFound = g:indexer_changeCurDirIfVimprjFound
 "endif
 
 

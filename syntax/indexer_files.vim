@@ -14,7 +14,7 @@ syn case ignore
 syn match  indexer_filesLabel       "^.\{-}="
 syn region indexer_filesHeader      start="^\[" end="\]"
 syn region indexer_filesQuoted      start='\v^\"' end='\v^\"' 
-syn match  indexer_filesComment     "\v^\#.*$"
+syn match  indexer_filesComment     "\v^\s*\#.*$"
 
 " Define the default highlighting.
 " For version 5.7 and earlier: only when not done already
