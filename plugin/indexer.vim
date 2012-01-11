@@ -59,6 +59,7 @@
 "              ["not_exist"]
 "              ["files"]
 "              ["wildcards"]
+"              ["options"]
 "              ["sFilelistFile"]
 "              ["paths"]
 "        ["filename"] = (for example) "/home/user/.indexer_files"
@@ -439,11 +440,6 @@ function! g:vimprj#dHooks['OnBufSave']['indexer'](dParams)
 
    call <SID>UpdateTagsForFile(l:iFileNum)
 
-   "call <SID>UpdateTagsForFile(
-   "\     '<afile>',
-   "\     g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave,
-   "\     g:vimprj#iCurFileNum
-   "\  )
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
 
@@ -832,7 +828,8 @@ endfunction
 "   changing '\' to '/' or vice versa depending on OS (MS Windows or not) also calls simplify()
 function! <SID>ParsePath(sPath)
    if (has('win32') || has('win64'))
-      let l:sPath = substitute(a:sPath, '/', '\', 'g')
+      "let l:sPath = substitute(a:sPath, '/', '\', 'g')
+      let l:sPath = substitute(a:sPath, '\', '/', 'g')
    else
       let l:sPath = substitute(a:sPath, '\', '/', 'g')
    endif
@@ -939,6 +936,11 @@ function! <SID>IndexerInfo()
          echo '* Index-mode: DIRS. (option g:indexer_ctagsDontSpecifyFilesIfPossible is ON)'
       else
          echo '* Index-mode: FILES. (option g:indexer_ctagsDontSpecifyFilesIfPossible is OFF)'
+         if g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsWriteFilelist
+            echo '* Filelist for ctags is USED (option g:indexer_ctagsWriteFilelist is ON)'
+         else
+            echo '* Filelist for ctags is NOT USED (option g:indexer_ctagsWriteFilelist is OFF)'
+         endif
       endif
       echo '* At file save: '.
                \ (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave 
@@ -993,12 +995,15 @@ endfunction
 "                                 Will be passed to ctags literally.
 "      sFilelistFile,   // ".." - file with list of files to be indexed. 
 "                                 Will be passed to ctags with -L key.
+"      sAddParams,      // ".." - Any additional params to ctags.
+"                                 Will be passed to ctags literally.
 "      dIndexerParams,  // g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
 "   }
 function! <SID>GetCtagsCommand(dParams)
    let l:sAppendCode = ''
    let l:sRecurseCode = ''
    let l:sFilelistFileCode = ''
+   let l:sAddParams = ''
 
    if (a:dParams.append)
       let l:sAppendCode = '-a'
@@ -1011,6 +1016,10 @@ function! <SID>GetCtagsCommand(dParams)
 
    if has_key(a:dParams, 'sFilelistFile') && !empty(a:dParams.sFilelistFile)
       let l:sFilelistFileCode = '-L "'.a:dParams.sFilelistFile.'"'
+   endif
+
+   if has_key(a:dParams, 'sAddParams')
+      let l:sAddParams = a:dParams['sAddParams']
    endif
 
    " when using append without Sed we SHOULD use sort, because of if there's no sort, then
@@ -1029,6 +1038,7 @@ function! <SID>GetCtagsCommand(dParams)
    let l:sTagsFile = '"'.a:dParams.sTagsFile.'"'
    let l:sCmd = s:dCtagsInfo['executable']
             \  .' -f '.l:sTagsFile.' '
+            \  .l:sAddParams.' '
             \  .l:sRecurseCode.' '
             \  .l:sAppendCode.' '
             \  .l:sSortCode.' '
@@ -1055,6 +1065,7 @@ endfunction
 "      lFilelist,          // [..]
 "      sFilelistFile,      // ".."
 "      sTagsFile,          // ".."
+"      sAddParams,         // ".."  - any additional ctags params
 "      recursive,          // 1 or 0
 "      dIndexerParams      // g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
 "   }
@@ -1071,6 +1082,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                \     'sTagsFile'      : a:dParams.sTagsFile,
                \     'sFilelistFile'  : a:dParams.sFilelistFile,
                \     'sFiles'         : '',
+               \     'sAddParams'     : a:dParams.sAddParams,
                \     'dIndexerParams' : a:dParams.dIndexerParams
                \  })
       
@@ -1085,6 +1097,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                \     'recursive'      : a:dParams.recursive,
                \     'sTagsFile'      : a:dParams.sTagsFile,
                \     'sFiles'         : "",
+               \     'sAddParams'     : a:dParams.sAddParams,
                \     'dIndexerParams' : a:dParams.dIndexerParams
                \  })
       let l:iCmdLen = strlen(l:sCmd)
@@ -1103,6 +1116,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                      \     'recursive'      : a:dParams.recursive,
                      \     'sTagsFile'      : a:dParams.sTagsFile,
                      \     'sFiles'         : l:sFiles,
+                     \     'sAddParams'     : a:dParams.sAddParams,
                      \     'dIndexerParams' : a:dParams.dIndexerParams
                      \  })
             let l:sFiles = ''
@@ -1117,6 +1131,7 @@ function! <SID>ExecCtagsForListOfFiles(dParams)
                   \     'recursive'      : a:dParams.recursive,
                   \     'sTagsFile'      : a:dParams.sTagsFile,
                   \     'sFiles'         : l:sFiles,
+                  \     'sAddParams'     : a:dParams.sAddParams,
                   \     'dIndexerParams' : a:dParams.dIndexerParams
                   \  })
       endif
@@ -1261,23 +1276,25 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile, dIndexe
          " need to rebuild all tags.
 
          " deleting old tagsfile
-         "if (filereadable(l:sTagsFile))
-            "call delete(l:sTagsFile)
-         "endif
-         "let l:dAsyncParams = {'mode' : 'AsyncModeDelete' , 'data' : { 'filename' : l:sTagsFile } }
-
          call <SID>DeleteFile(l:sTagsFile."_tmp")
 
          " generating tags for files
+         " if sFilelistFile is present, then do not pass lFiles
          let l:lFiles = (empty(l:dCurProject.sFilelistFile) 
                   \     ? l:dCurProject.files 
                   \     : []
                   \  )
 
+         let l:sCtagsAddParams = ''
+         if has_key(l:dCurProject['options'], 'ctags_params')
+            let l:sCtagsAddParams = l:dCurProject['options']['ctags_params']
+         endif
+
          call <SID>ExecCtagsForListOfFiles({
                   \     'lFilelist'      : l:lFiles,
                   \     'sFilelistFile'  : l:dCurProject.sFilelistFile,
                   \     'sTagsFile'      : l:sTagsFile."_tmp",
+                  \     'sAddParams'     : l:sCtagsAddParams,
                   \     'recursive'      : 0,
                   \     'dIndexerParams' : a:dIndexerParams
                   \  })
@@ -1287,10 +1304,12 @@ function! <SID>UpdateTagsForProject(sProjFileKey, sProjName, sSavedFile, dIndexe
                   \     'lFilelist'      : l:dCurProject.pathsForCtags,
                   \     'sFilelistFile'  : '',
                   \     'sTagsFile'      : l:sTagsFile."_tmp",
+                  \     'sAddParams'     : l:sCtagsAddParams,
                   \     'recursive'      : 1,
                   \     'dIndexerParams' : a:dIndexerParams
                   \  })
 
+         " rename tmp file to real tags file
          call <SID>RenameFile(l:sTagsFile."_tmp", l:sTagsFile)
 
       endif
@@ -1349,6 +1368,7 @@ endfunction
 "                              [not_exist]
 "                              [pathsForCtags]
 "                              [pathsRoot]
+"                              [options]
 " dResult[<название_проекта_2>][files]
 "                              [wildcards]
 "                              [sFilelistFile]
@@ -1356,6 +1376,7 @@ endfunction
 "                              [not_exist]
 "                              [pathsForCtags]
 "                              [pathsRoot]
+"                              [options]
 " ...
 "
 " параметры:                             
@@ -1383,7 +1404,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
       if l:sLine !~ '^\s*$' && l:sLine !~ '^\s*\#.*$'
 
          " look for project name [PrjName]
-         let l:myMatch = matchlist(l:sLine, '^\s*\[\([^\]]\+\)\]')
+         let l:myMatch = matchlist(l:sLine, '\v^\s*\[(.+)\]')
 
          if (len(l:myMatch) > 0)
             " remember what is in []
@@ -1437,7 +1458,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
                if l:boolInNeededProject
                   let l:sCurProjName = l:sProjName
-                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
+                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
                endif
             endif
          else
@@ -1468,85 +1489,96 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, l:dResult, a:dIndexerParams)
                
             elseif l:boolInNeededProject
-               " looks like there's path
-               if l:sCurProjName == ''
-                  let l:sCurProjName = 'noname'
-                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
-               endif
 
-               " we should separately expand every variable
-               " like $BLABLABLA
-               let l:sPatt = "\\v(\\$[a-zA-Z0-9_]+)"
-               let l:sUnknownPrefix = '-=UNKNOWN=-'
-               while (1)
-                  let l:varMatch = matchlist(l:sLine, l:sPatt)
-                  " if there's any $BLABLA in string
-                  if (len(l:varMatch) > 0)
-                     let l:sValue = expand(l:varMatch[1])
+               " look for options
+               "        option:my_cool_option = "cool value"
+               let l:myMatch = matchlist(l:sLine, '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"')
 
-                     if l:sValue == l:varMatch[1]
-                        " unknown variable
-                        call confirm('Indexer warning: unknown variable in '.a:indexerFile.': '.l:sValue)
-                        let l:sValue = substitute(l:sValue, '\V$', l:sUnknownPrefix, '')
-                     endif
-
-                     " changing one slash in value to doubleslash
-                     let l:sValue = substitute(l:sValue, "\\\\", "\\\\\\\\", "g")
-                     " changing $BLABLA to its value (doubleslashed)
-                     let l:sLine = substitute(l:sLine, l:sPatt, l:sValue, "")
-                  else 
-                     break
-                  endif
-               endwhile
-
-               let l:sLine = substitute(l:sLine, '\V'.l:sUnknownPrefix, '$', 'g')
-
-
-               let l:sTmpLine = l:sLine
-               " removing last part of path (removing all after last slash)
-               let l:sTmpLine = substitute(l:sTmpLine, '^\(.*\)[\\/][^\\/]\+$', '\1', 'g')
-               " removing asterisks at end of line
-               let l:sTmpLine = substitute(l:sTmpLine, '^\([^*]\+\).*$', '\1', '')
-               " removing final slash
-               let l:sTmpLine = substitute(l:sTmpLine, '[\\/]$', '', '')
-
-               let l:dResult[l:sCurProjName].pathsRoot = <SID>ConcatLists(l:dResult[l:sCurProjName].pathsRoot, [<SID>ParsePath(l:sTmpLine)])
-               let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, [<SID>ParsePath(l:sTmpLine)])
-
-
-
-               " -- now we should generate all subdirs
-               "    (if g:indexer_getAllSubdirsFromIndexerListFile is on)
-
-               let l:lSubPaths = []
-
-               if a:dIndexerParams['getAllSubdirsFromIndexerListFile']
-                  " getting string with all subdirs
-                  let l:sSubPaths = expand(l:sTmpLine."/**/")
-                  " removing final slash at end of every dir
-                  let l:sSubPaths = substitute(l:sSubPaths, '\v[\\/](\n|$)', '\1', 'g')
-                  " getting list from string
-                  let l:lSubPaths = split(l:sSubPaths, '\n')
-               endif
-
-               
-
-
-               let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lSubPaths)
-
-
-               let l:sCurWildcard = substitute(<SID>Trim(l:sLine), '\\\*\*', '**', 'g')
-               let l:dResult[l:sCurProjName].wildcards = <SID>ConcatLists(l:dResult[l:sCurProjName].wildcards, [ l:sCurWildcard ])
-
-               if (!<SID>_UseDirsInsteadOfFiles(a:dIndexerParams))
-                  " adding every file.
-                  let l:dResult[l:sCurProjName].files = <SID>ConcatLists(
-                           \     l:dResult[l:sCurProjName].files, 
-                           \     split(expand(l:sCurWildcard), '\n')
-                           \  )
+               if (len(l:myMatch) > 0)
+                  " this is an option
+                  let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
                else
-                  " adding just paths. (much more faster)
-                  let l:dResult[l:sCurProjName].pathsForCtags = l:dResult[l:sCurProjName].pathsRoot
+
+                  " looks like there's path
+                  if l:sCurProjName == ''
+                     let l:sCurProjName = 'noname'
+                     let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+                  endif
+
+                  " we should separately expand every variable
+                  " like $BLABLABLA
+                  let l:sPatt = "\\v(\\$[a-zA-Z0-9_]+)"
+                  let l:sUnknownPrefix = '-=UNKNOWN=-'
+                  while (1)
+                     let l:varMatch = matchlist(l:sLine, l:sPatt)
+                     " if there's any $BLABLA in string
+                     if (len(l:varMatch) > 0)
+                        let l:sValue = expand(l:varMatch[1])
+
+                        if l:sValue == l:varMatch[1]
+                           " unknown variable
+                           call confirm('Indexer warning: unknown variable in '.a:indexerFile.': '.l:sValue)
+                           let l:sValue = substitute(l:sValue, '\V$', l:sUnknownPrefix, '')
+                        endif
+
+                        " changing one slash in value to doubleslash
+                        let l:sValue = substitute(l:sValue, "\\\\", "\\\\\\\\", "g")
+                        " changing $BLABLA to its value (doubleslashed)
+                        let l:sLine = substitute(l:sLine, l:sPatt, l:sValue, "")
+                     else 
+                        break
+                     endif
+                  endwhile
+
+                  let l:sLine = substitute(l:sLine, '\V'.l:sUnknownPrefix, '$', 'g')
+
+
+                  let l:sTmpLine = l:sLine
+                  " removing last part of path (removing all after last slash)
+                  let l:sTmpLine = substitute(l:sTmpLine, '^\(.*\)[\\/][^\\/]\+$', '\1', 'g')
+                  " removing asterisks at end of line
+                  let l:sTmpLine = substitute(l:sTmpLine, '^\([^*]\+\).*$', '\1', '')
+                  " removing final slash
+                  let l:sTmpLine = substitute(l:sTmpLine, '[\\/]$', '', '')
+
+                  let l:dResult[l:sCurProjName].pathsRoot = <SID>ConcatLists(l:dResult[l:sCurProjName].pathsRoot, [<SID>ParsePath(l:sTmpLine)])
+                  let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, [<SID>ParsePath(l:sTmpLine)])
+
+
+
+                  " -- now we should generate all subdirs
+                  "    (if g:indexer_getAllSubdirsFromIndexerListFile is on)
+
+                  let l:lSubPaths = []
+
+                  if a:dIndexerParams['getAllSubdirsFromIndexerListFile']
+                     " getting string with all subdirs
+                     let l:sSubPaths = expand(l:sTmpLine."/**/")
+                     " removing final slash at end of every dir
+                     let l:sSubPaths = substitute(l:sSubPaths, '\v[\\/](\n|$)', '\1', 'g')
+                     " getting list from string
+                     let l:lSubPaths = split(l:sSubPaths, '\n')
+                  endif
+
+
+
+
+                  let l:dResult[l:sCurProjName].paths = <SID>ConcatLists(l:dResult[l:sCurProjName].paths, l:lSubPaths)
+
+
+                  let l:sCurWildcard = substitute(<SID>Trim(l:sLine), '\\\*\*', '**', 'g')
+                  let l:dResult[l:sCurProjName].wildcards = <SID>ConcatLists(l:dResult[l:sCurProjName].wildcards, [ l:sCurWildcard ])
+
+                  if (!<SID>_UseDirsInsteadOfFiles(a:dIndexerParams))
+                     " adding every file.
+                     "let l:dResult[l:sCurProjName].files = <SID>ConcatLists(
+                     "\     l:dResult[l:sCurProjName].files, 
+                     "\     split(expand(l:sCurWildcard), '\n')
+                     "\  )
+                  else
+                     " adding just paths. (much more faster)
+                     let l:dResult[l:sCurProjName].pathsForCtags = l:dResult[l:sCurProjName].pathsRoot
+                  endif
                endif
             endif
 
@@ -1555,7 +1587,48 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
    endfor
 
+
+   " ---
+
+   if (!<SID>_UseDirsInsteadOfFiles(a:dIndexerParams))
+      for l:sCurProj in keys(l:dResult)
+         call <SID>ExpandAllWildcards(l:dResult[ l:sCurProj ])
+      endfor
+   endif
+
    return l:dResult
+endfunction
+
+
+function! <SID>ExpandAllWildcards(dProject)
+
+   if len(a:dProject.wildcards)
+      let a:dProject.files = []
+
+      for l:sCurWildcard in a:dProject.wildcards
+         let a:dProject.files = <SID>ConcatLists(
+                  \     a:dProject.files, 
+                  \     split(expand(l:sCurWildcard), '\n')
+                  \  )
+      endfor
+   endif
+
+endfunction
+
+function! <SID>GenerateFilelist(dProject, sFilelistFile)
+
+   let a:dProject.sFilelistFile = ''
+
+   if len(a:dProject.files) > 2
+      let a:dProject.sFilelistFile = a:sFilelistFile
+      let l:res = writefile(a:dProject.files, a:dProject.sFilelistFile)
+      if l:res != 0
+         " error while writing file!
+         let a:dProject.sFilelistFile = ''
+      endif
+
+   endif
+
 endfunction
 
 " getting dictionary with files, paths and non-existing files from indexer
@@ -1617,7 +1690,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, dIndexerParams)
 
          if l:boolInNeededProject && (l:iOpenedBraces == l:iOpenedBracesAtProjectStart)
             let l:sCurProjName = l:myMatch[1]
-            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [] }
+            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
          endif
 
          let l:sLastFoundPath = l:myMatch[2]
@@ -1775,15 +1848,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
       " now generate filelist if needed
 
       if g:vimprj#dRoots[ l:sVimprjKey ]['indexer']['ctagsWriteFilelist']
-         if len(l:dCurProject.files) > 2
-            let l:dCurProject.sFilelistFile = l:sTagsDirname.'/'.l:sTagsFileWOPath.'_files'
-            let l:res = writefile(l:dCurProject.files, l:dCurProject.sFilelistFile)
-            if l:res != 0
-               " error while writing file!
-               let l:dCurProject.sFilelistFile = ''
-            endif
-
-         endif
+         call <SID>GenerateFilelist(l:dCurProject, l:sTagsDirname.'/'.l:sTagsFileWOPath.'_files')
       endif
 
 
@@ -1819,11 +1884,31 @@ function! <SID>UpdateTagsForFile(iFileNum)
       if (<SID>IsFileExistsInList(l:dCurProject.not_exist, l:sSavedFile))
          call remove(l:dCurProject.not_exist, index(l:dCurProject.not_exist, l:sSavedFile))
          call add(l:dCurProject.files, l:sSavedFile)
+         " write new filelist if an old one already exists
+         if !empty(l:dCurProject['sFilelistFile'])
+            call <SID>GenerateFilelist(l:dCurProject, l:dCurProject['sFilelistFile'])
+         endif
       endif
 
       if l:boolJustAppendTags
+         " just append existing tags
          call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, l:sSavedFile, g:vimprj#dRoots[ l:sVimprjKey ]['indexer'])
       else
+         " rebuild tags for a whole project
+
+         " if IndexerFile and FILES mode, then we need to re-expand all wildcards
+         " and write new filelist if needed.
+         if (           !<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ l:sVimprjKey ]['indexer'])
+                  \     && s:dProjFilesParsed[ l:lFileProjs.file ]['type'] == 'IndexerFile'
+                  \  )
+            call <SID>ExpandAllWildcards(l:dCurProject)
+            if !empty(l:dCurProject['sFilelistFile'])
+               " write filelist
+               call <SID>GenerateFilelist(l:dCurProject, l:dCurProject['sFilelistFile'])
+            endif
+         endif
+
+
          call <SID>UpdateTagsForProject(l:lFileProjs.file, l:lFileProjs.name, "", g:vimprj#dRoots[ l:sVimprjKey ]['indexer'])
       endif
 
@@ -2075,6 +2160,8 @@ let s:dProjFilesParsed = {}
 
 "autocmd BufWritePost * call <SID>OnBufSave()
 
+" set filetype 'conf' for .indexer_files
+au BufRead,BufNewFile *.indexer_files set filetype=indexer_files
 
 
 
