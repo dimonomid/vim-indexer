@@ -1395,10 +1395,11 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
    let l:boolInNeededProject = (a:dIndexerParams['projectName'] == '' ? 1 : 0)
    let l:boolInProjectsParentSection = 0
    let l:sProjectsParentFilter = ''
-   let l:lProjectsParentOptions = []
+   let l:dProjectsParentOptions = {}
 
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
+   "let l:i = 0
 
    for l:sLine in l:aLines
 
@@ -1422,7 +1423,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   let l:sProjectsParentFilter = l:filterMatch[1]
                endif
 
-               let l:lProjectsParentOptions = []
+               let l:dProjectsParentOptions = {}
 
                let l:boolInProjectsParentSection = 1
 
@@ -1476,8 +1477,11 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
             if (len(l:myMatch) > 0)
                if l:boolInProjectsParentSection
+
                   " OPTION in parsing one project parent
-                  call add(l:lProjectsParentOptions, l:myMatch[0])
+                  "call add(l:lProjectsParentOptions, l:myMatch[0])
+                  let l:dProjectsParentOptions[l:myMatch[1]] = l:myMatch[2]
+
                elseif l:boolInNeededProject
                   " OPTION in usual project
                   let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
@@ -1497,13 +1501,14 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   " creating list of projects
                   let l:lProjects = split(expand(l:projectsParent.'/*'), '\n')
                   let l:lIndexerFilesList = []
+
                   for l:sPrj in l:lProjects
                      if (isdirectory(l:sPrj))
                         call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
 
                         " adding options
-                        for l:sCurOption in l:lProjectsParentOptions
-                           call add(l:lIndexerFilesList, l:sCurOption)
+                        for l:sCurOptionKey in keys(l:dProjectsParentOptions)
+                           call add(l:lIndexerFilesList, 'option:'.l:sCurOptionKey.' = "'.l:dProjectsParentOptions[ l:sCurOptionKey ].'"')
                         endfor
 
                         " adding items
@@ -1514,10 +1519,11 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                         call add(l:lIndexerFilesList, '')
                      endif
 
-                     " TODO: remove
-                     "writefile(l:lIndexerFilesList, "D:/tmp123")
-
                   endfor
+
+                  "call writefile(l:lIndexerFilesList, "D:/tmp123_".l:i)
+                  "let l:i = l:i + 1
+
                   " parsing this list
                   let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, l:dResult, a:dIndexerParams)
 
