@@ -1395,6 +1395,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
    let l:boolInNeededProject = (a:dIndexerParams['projectName'] == '' ? 1 : 0)
    let l:boolInProjectsParentSection = 0
    let l:sProjectsParentFilter = ''
+   let l:lProjectsParentOptions = []
 
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
@@ -1420,7 +1421,12 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                if (len(l:filterMatch) > 0)
                   let l:sProjectsParentFilter = l:filterMatch[1]
                endif
+
+               let l:lProjectsParentOptions = []
+
                let l:boolInProjectsParentSection = 1
+
+
             else
                " this is usual project section.
                " look if sProjName is like %blabla%
@@ -1471,7 +1477,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
             if (len(l:myMatch) > 0)
                if l:boolInProjectsParentSection
                   " OPTION in parsing one project parent
-                  " TODO
+                  call add(l:lProjectsParentOptions, l:myMatch[0])
                elseif l:boolInNeededProject
                   " OPTION in usual project
                   let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
@@ -1494,11 +1500,23 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   for l:sPrj in l:lProjects
                      if (isdirectory(l:sPrj))
                         call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
+
+                        " adding options
+                        for l:sCurOption in l:lProjectsParentOptions
+                           call add(l:lIndexerFilesList, l:sCurOption)
+                        endfor
+
+                        " adding items
                         for l:sCurFilter in l:lFilter
                            call add(l:lIndexerFilesList, l:sPrj.'/**/'.l:sCurFilter)
                         endfor
+                        
                         call add(l:lIndexerFilesList, '')
                      endif
+
+                     " TODO: remove
+                     "writefile(l:lIndexerFilesList, "D:/tmp123")
+
                   endfor
                   " parsing this list
                   let l:dResult = <SID>GetDirsAndFilesFromIndexerList(l:lIndexerFilesList, a:indexerFile, l:dResult, a:dIndexerParams)
