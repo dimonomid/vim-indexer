@@ -1,3 +1,5 @@
+*) in g:vimprj#dFiles['projects'] move to ['indexer']['projects']
+
 *) in FILES mode with .indexer_files we need re-expand wildcards only when :IndexerRebuild is called or .indexer_files is saved
 
 *) add options in docs
