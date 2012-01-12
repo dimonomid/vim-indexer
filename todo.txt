@@ -1,3 +1,7 @@
+*) add known bugs to docs:
+      - if you edit .indexer_files and you renamed your project, then you have to restart vim to make it work
+      - if ctags becomes zombie, then all your tags generation is broken until vim is restarted
+
 *) in g:vimprj#dFiles['projects'] move to ['indexer']['projects']
 
 *) in FILES mode with .indexer_files we need re-expand wildcards only when :IndexerRebuild is called or .indexer_files is saved
