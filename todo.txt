@@ -1,7 +1,7 @@
-*) when .vimprojects is used, and some file is added to project, then it appears in tags just when saved SECOND time, not first.
+*) in FILES mode with .indexer_files we need re-expand wildcards only when :IndexerRebuild is called or .indexer_files is saved
 
-*) if FILES mode, when .indexer_files is used, we need to refresh all wildcards at every tags rebuild.
-   (when tags is rebuilded at every filesave - then we need to refresh all wildcards at every filesave)
+*) add options in docs
+*) explain in docs that filters in .indexer_files take effect only in FILES mode
 
 *) добавить в доки описание приоритета .indexer_files или .vimprojects если один из них находится в .vimprj, а другой нет
 *) если в директории PROJECTS_PARENT что-то поменялось, то для применения изменений нужно перезапускать Vim. Нужно сделать, чтобы перезапуск не требовался
@@ -33,6 +33,8 @@ some_path/**/*.[ch]
 
 
 *) need to fix: if ctags becomes zombie just once, then indexer can't stop it and so it doesn't index anything until Vim is restarted. See todo/hgcommand.vim file - ctags becomes zombie if you try to generate tags for it
+
+-*) when .vimprojects is used, and some file is added to project, then it appears in tags just when saved SECOND time, not first.
 
 -*) If indexer gives every filename to ctags, there could be better to use -L
     key instead of put every filename to command

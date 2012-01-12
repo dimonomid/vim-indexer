@@ -1,5 +1,6 @@
-3.14
+4.05
 
-* Bugfix: background tags generation was fail on Windows 7. Now it's ok. (actually, i don't really understand why it was fail. On Linux and on Windows XP all works fine. I just found workaround to make it work on Win7 too) Thanks to Shi Haipend for bugreport.
-* Some improvements in troubleshooting: added debug log and debug snapshot. (read :help indexer-debug-commands)
+*) increased speed when working with .vimprojects
+*) added syntax for .indexer_files
+*) option:ctags_params="..."
 
