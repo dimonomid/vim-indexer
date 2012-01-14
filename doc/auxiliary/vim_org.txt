@@ -26,7 +26,7 @@ If you don't use project.tar.gz then you can use ".indexer_files" to define proj
 
 Syntax of this file is simple, probably the best way to explain it is to show an example:
 
-NOTE! Since Indexer 4.10 syntax of .indexer_files is changed a bit, to make ctags work much more effectifely.  However, old syntax will work too, for backward compatibility.  If you used Indexer before with .indexer_files, please read this:
+NOTE! Since Indexer 4.10 syntax of .indexer_files is changed a bit, to make ctags work much more effectively.  However, old syntax will work too, for backward compatibility.  If you used Indexer before with .indexer_files, please read this:
 :help indexer-syn-change-4.10
 
 --------------------- example ~/.indexer_files -----------------------

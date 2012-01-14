@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     4.04
+" Version:     4.10
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -126,7 +126,7 @@ if !exists("g:vimprj#version") || g:vimprj#version < s:iVimprj_min_version
    finish
 endif
 
-let g:iIndexerVersion = 404
+let g:iIndexerVersion = 410
 let g:loaded_indexer  = 1
 
 
