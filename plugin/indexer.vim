@@ -176,7 +176,7 @@ if !s:sVimprjCompatibility.boolCompatible
    if !empty(s:sVimprjCompatibility.msg)
       call confirm(s:sVimprjCompatibility.msg)
    endif
-   finish
+   let s:boolNeedFinish = 1
 endif
 
 " CHECK DEPENDENCY: DfrankUtil
@@ -198,9 +198,15 @@ if !s:sDfrankUtilCompatibility.boolCompatible
    if !empty(s:sDfrankUtilCompatibility.msg)
       call confirm(s:sDfrankUtilCompatibility.msg)
    endif
-   finish
+   let s:boolNeedFinish = 1
 endif
 
+" -----
+
+
+if exists("s:boolNeedFinish")
+   finish
+endif
 
 
 " all dependencies is ok
