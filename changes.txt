@@ -1,6 +1,5 @@
-4.05
+4.11
 
-*) increased speed when working with .vimprojects
-*) added syntax for .indexer_files
-*) option:ctags_params="..."
+*) You need latest vimprj plugin version 1.06
+*) optimized algorithm detecting project for file
 

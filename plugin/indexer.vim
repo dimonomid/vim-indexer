@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     4.10
+" Version:     4.11
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -119,10 +119,10 @@ catch
    " no vimprj plugin installed
 endtry
 
-let s:iVimprj_min_version = 102
+let s:iVimprj_min_version = 106
 
 if !exists("g:vimprj#version") || g:vimprj#version < s:iVimprj_min_version
-   call confirm("Indexer error: since Indexer version 4.0 you need for plugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
+   call confirm("Indexer error: since Indexer version 4.11 you need for \nplugin 'vimprj' version ".s:iVimprj_min_version." to be installed.")
    finish
 endif
 
@@ -246,7 +246,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
    endif
 
 
-   let l:sProjFileKey = <SID>GetKeyFromPath(l:sProjFilename)
+   let l:sProjFileKey = dfrank#util#GetKeyFromPath(l:sProjFilename)
 
    if (l:sProjFileKey != "") " если нашли файл с описанием проектов
       if (!exists("s:dProjFilesParsed['".l:sProjFileKey."']"))
@@ -265,7 +265,7 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
          augroup Indexer_SavPrjFile
             "let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], '^.*[\\/]\([^\\/]\+\)$', '\1', '')
             let l:sPrjFile = substitute(s:dProjFilesParsed[ l:sProjFileKey ]["filename"], ' ', '\\\\\\ ', 'g')
-            exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(<SID>GetKeyFromPath(expand("<afile>:p")))'
+            exec 'autocmd Indexer_SavPrjFile BufWritePost '.l:sPrjFile.' call <SID>UpdateTagsForEveryNeededProjectFromFile(dfrank#util#GetKeyFromPath(expand("<afile>:p")))'
          augroup END
 
 
@@ -790,7 +790,7 @@ function! <SID>AddNewProjectToCurFile(sProjFileKey, sProjName, iFileNum)
    call add(g:vimprj#dFiles[ a:iFileNum ].projects, {"file" : a:sProjFileKey, "name" : a:sProjName})
 endfunction
 
-function! <SID>GetKeyFromPath(sPath)
+function! dfrank#util#GetKeyFromPath(sPath)
    let l:sKey = substitute(a:sPath, '[^a-zA-Z0-9_]', '_', 'g')
 
    if has('win32') || has('win64')
@@ -1920,7 +1920,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
       let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
       let l:dCurProject["boolIndexed"] = 0
 
-      "let l:sTagsFileWOPath = <SID>GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
+      "let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
       "let l:sTagsFile = s:tagsDirname.'/'.l:sTagsFileWOPath
 
       " если директория для тегов не указана в конфиге - значит, юзаем
@@ -1933,11 +1933,11 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
       if empty(s:indexer_tagsDirname)
          " директория для тегов НЕ указана
          let l:sTagsDirname = s:dProjFilesParsed[a:sProjFileKey]["filename"]."_tags"
-         let l:sTagsFileWOPath = <SID>GetKeyFromPath(l:sCurProjName)
+         let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(l:sCurProjName)
       else
          " директория для тегов указана
          let l:sTagsDirname = s:indexer_tagsDirname
-         let l:sTagsFileWOPath = <SID>GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
+         let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
       endif
 
       let l:sTagsFile = l:sTagsDirname.'/'.l:sTagsFileWOPath
