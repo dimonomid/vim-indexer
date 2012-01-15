@@ -299,6 +299,11 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
       "                  находится открытый файл, является поддиректорией
       "                  проекта, но не перечислена явно в файле проекта.
       "
+      "                  In Indexer 4.11 this algorithm was optimized:
+      "                  just paths beginning are compared, without 
+      "                  going up by tree.
+      "
+      "
       "
       if (a:dParams['dVimprjRootParams'].projectName == '')
          " пользователь не указал явно название проекта. Нам нужно выяснять.
@@ -308,12 +313,13 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
          if (a:dParams['dVimprjRootParams'].enableWhenProjectDirFound || <SID>_UseDirsInsteadOfFiles(a:dParams['dVimprjRootParams']))
             " режим директорий
             for l:sCurProjName in keys(s:dProjFilesParsed[ l:sProjFileKey ]["projects"])
-               let l:boolFound = 0
-               let l:i = 0
-               let l:sCurPath = ''
-               while (!l:boolFound && l:i < 10)
-                  "let l:tmp = input(simplify(expand('%:p:h').l:sCurPath)."====".join(s:dProjFilesParsed[ l:sProjFileKey ]["projects"][l:sCurProjName].paths, ', '))
-                  if (<SID>IsFileExistsInList(s:dProjFilesParsed[ l:sProjFileKey ]["projects"][l:sCurProjName].paths, expand('%:p:h').l:sCurPath))
+
+               let l:dCurProject = s:dProjFilesParsed[ l:sProjFileKey ]["projects"][l:sCurProjName]
+               let l:sFilename = <SID>ParsePath(<SID>BufName(l:iFileNum))
+
+               for l:sCurPath in l:dCurProject.pathsRoot
+                  "if <SID>IsFileInSubdirSimple(expand('%:p'), l:sCurPath)
+                  if <SID>IsFileInSubdirSimple(l:sFilename, l:sCurPath)
                      " user just opened file from subdir of project l:sCurProjName. 
                      " We should add it to result lists
 
@@ -324,9 +330,8 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                      call add(l:lProjects, l:sCurProjName)
                      break
                   endif
-                  let l:i = l:i + 1
-                  let l:sCurPath = l:sCurPath.'/..'
-               endwhile
+               endfor
+
             endfor
 
             if (l:iProjectsAddedCnt > 1)
@@ -852,6 +857,14 @@ endfunction
 " trims spaces from begin and end of string
 function! <SID>Trim(sString)
    return substitute(substitute(a:sString, '^\s\+', '', ''), '\s\+$', '', '')
+endfunction
+
+
+function! <SID>IsFileInSubdirSimple(sFilename, sDirname)
+
+   let l:iDirnameLen = strlen(a:sDirname)
+
+   return (strpart(a:sFilename, 0, l:iDirnameLen) == a:sDirname)
 endfunction
 
 " <SID>IsAbsolutePath(path) <<<
