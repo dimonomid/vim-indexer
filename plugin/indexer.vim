@@ -553,7 +553,10 @@ if has("win32") || has("win64")
          let l:cmd .= " & ".a:vim_cmd
       endif
 
-      silent exec "!start /MIN cmd /c \"".l:cmd."\""
+      let l:sFullCmd = "!start /MIN cmd /c \"".l:cmd."\""
+      let s:sLastOSCmd = l:sFullCmd
+
+      silent exec l:sFullCmd
    endfunction
 else
    " Works in linux (Ubuntu 10.04)
@@ -565,7 +568,10 @@ else
          let l:cmd .= " ; ".a:vim_cmd
       endif
 
-      silent exec "! (".l:cmd.") &"
+      let l:sFullCmd = "! (".l:cmd.") &"
+      let s:sLastOSCmd = l:sFullCmd
+
+      silent exec l:sFullCmd
    endfunction
 endif
 
@@ -727,8 +733,9 @@ function! <SID>IndexerDebugInfo()
    echo '* Ctags boolCtagsExists: '.s:dCtagsInfo['boolCtagsExists']
    echo '* Ctags boolPatched: '.s:dCtagsInfo['boolPatched']
    echo '* Ctags versionFirstLine: '.s:dCtagsInfo['versionFirstLine']
-   echo '* Ctags last command: "'.s:sLastCtagsCmd.'"'
-   echo '* Ctags last output: "'.s:sLastCtagsOutput.'"'
+   echo '* OS last command: '.s:sLastOSCmd.''
+   echo '* Ctags last command: '.s:sLastCtagsCmd.''
+   echo '* Ctags last output: '.s:sLastCtagsOutput.''
 endfunction
 
 
@@ -2264,6 +2271,7 @@ if empty(s:dCtagsInfo['boolCtagsExists'])
    echomsg "Indexer error: Exuberant Ctags not found in PATH. You need to install Ctags to make Indexer work."
 endif
 
+let s:sLastOSCmd =         "** no OS commands yet **"
 let s:sLastCtagsCmd =      "** no ctags commands yet **"
 let s:sLastCtagsOutput =   "** no output yet **"
 
