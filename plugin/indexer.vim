@@ -413,8 +413,15 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                      endif
                      let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                      call add(l:lProjects, l:sCurProjName)
-                     break " because just one project for file is supported now, so, break.
+                     break
                   endif
+
+                  " just one project for each file is supported, so, break.
+                  "  COMMENTED: because we need to use better project
+                  "if l:iProjectsAddedCnt > 0
+                     "break
+                  "endif
+
                endfor
 
             endfor
@@ -431,12 +438,16 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                   endif
                   let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                   call add(l:lProjects, l:sCurProjName)
-                  break " because just one project for file is supported now, so, break.
+                  "break " because just one project for file is supported now, so, break.
+                  "  COMMENTED: because we need to use better project
 
                endif
             endfor
 
          endif
+
+         "TODO: check all the projects, if one of them is a subdir of another
+         "      one, then remove parent, leave the child only.
 
          if (l:iProjectsAddedCnt > 1)
             " it should never happen,
