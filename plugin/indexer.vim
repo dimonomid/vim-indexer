@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     4.12
+" Version:     4.13
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -211,7 +211,7 @@ endif
 
 " all dependencies is ok
 
-let g:iIndexerVersion = 412
+let g:iIndexerVersion = 413
 let g:loaded_indexer  = 1
 
 
@@ -590,7 +590,18 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
 
       let vim_cmd = ""
       if !empty(a:vim_func)
-         let vim_cmd = "vim --servername ".v:servername." --remote-expr \"" . a:vim_func . "('" . temp_file . "')\" "
+
+         if g:indexer_vimExecutable == '*auto*'
+            if has('mac')
+               let sVimExecutable = 'mvim'
+            else
+               let sVimExecutable = 'vim'
+            endif
+         else
+            let sVimExecutable = g:indexer_vimExecutable
+         endif
+
+         let vim_cmd = sVimExecutable." --servername ".v:servername." --remote-expr \"" . a:vim_func . "('" . temp_file . "')\" "
       endif
 
       call <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
@@ -2228,6 +2239,10 @@ endif
 
 if !exists('g:indexer_ctagsWriteFilelist')
    let g:indexer_ctagsWriteFilelist = 1
+endif
+
+if !exists('g:indexer_vimExecutable')
+   let g:indexer_vimExecutable = '*auto*'
 endif
 
 
