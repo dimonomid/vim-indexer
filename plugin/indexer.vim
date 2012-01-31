@@ -408,9 +408,9 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                      " user just opened file from subdir of project l:sCurProjName. 
                      " We should add it to result lists
 
-                     if l:iProjectsAddedCnt == 0
+                     "if l:iProjectsAddedCnt == 0
                         call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName, l:iFileNum)
-                     endif
+                     "endif
                      let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                      call add(l:lProjects, l:sCurProjName)
                      break
@@ -433,9 +433,9 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                   " user just opened file from project l:sCurProjName. We should add it to
                   " result lists
 
-                  if l:iProjectsAddedCnt == 0
+                  "if l:iProjectsAddedCnt == 0
                      call <SID>AddNewProjectToCurFile(l:sProjFileKey, l:sCurProjName, l:iFileNum)
-                  endif
+                  "endif
                   let l:iProjectsAddedCnt = l:iProjectsAddedCnt + 1
                   call add(l:lProjects, l:sCurProjName)
                   "break " because just one project for file is supported now, so, break.
@@ -446,12 +446,11 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
          endif
 
-         "TODO: check all the projects, if one of them is a subdir of another
-         "      one, then remove parent, leave the child only.
-
+         " check all the projects, if one of them is a subdir of another
+         " one, then remove parent, leave the nested one only.
 
          if (l:iProjectsAddedCnt > 1)
-            let boolCheckNested = 1
+            let boolCheckNested = 1 " need to check again all the projects
 
             while boolCheckNested && l:iProjectsAddedCnt > 1
                let boolCheckNested = 0
@@ -463,6 +462,11 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
                      let lPathsRoot_i = s:dProjFilesParsed[ l:sProjFileKey ]["projects"][ l:lProjects[i] ]["pathsRoot"]
                      let lPathsRoot_j = s:dProjFilesParsed[ l:sProjFileKey ]["projects"][ l:lProjects[j] ]["pathsRoot"]
+
+                     " need to make two passes:
+                     " 1) check if ALL project's root paths are in subdir of
+                     "    any ONE dir of another project
+                     " 2) swap projects and check the same again
 
                      for iPassNum in range(0, 1)
 
@@ -485,11 +489,14 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
                               endif
                            endfor
                            if boolSubdir
+
                               " project '2' is in subdir of project '1'!
                               " so, remove project '1'
                               unlet l:lProjects[iOuterPrjNum]
+                              unlet g:vimprj#dFiles[ l:iFileNum ]["projects"][iOuterPrjNum]
                               let l:iProjectsAddedCnt = l:iProjectsAddedCnt - 1
-                              let boolCheckNested = 1
+
+                              let boolCheckNested = 1 " need to check again all the projects
                               break
                            endif
                         endfor
@@ -517,9 +524,6 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
 
          if (l:iProjectsAddedCnt > 1)
-            " it should never happen,
-            " because just one project for file is supported now, so,
-            " we break when first project is found.
             echoerr "Warning: file '".l:sFilename."' exists in several projects: '".join(l:lProjects, ', ')."'. Only first is indexed."
          endif
 
@@ -1607,7 +1611,8 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
                   for l:sPrj in l:lProjects
                      if (isdirectory(l:sPrj))
-                        call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
+                        "call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
+                        call add(l:lIndexerFilesList, '['.l:sPrj.']')
 
                         " adding options
                         for l:sCurOptionKey in keys(l:dProjectsParentOptions)
