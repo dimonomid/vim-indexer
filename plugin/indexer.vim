@@ -449,6 +449,73 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
          "TODO: check all the projects, if one of them is a subdir of another
          "      one, then remove parent, leave the child only.
 
+
+         if (l:iProjectsAddedCnt > 1)
+            let boolCheckNested = 1
+
+            while boolCheckNested && l:iProjectsAddedCnt > 1
+               let boolCheckNested = 0
+               for i in range(0, len(l:lProjects) - 1 - 1)
+
+                  for j in range(1, len(l:lProjects) - 1)
+
+                     " comparing root paths for two projects
+
+                     let lPathsRoot_i = s:dProjFilesParsed[ l:sProjFileKey ]["projects"][ l:lProjects[i] ]["pathsRoot"]
+                     let lPathsRoot_j = s:dProjFilesParsed[ l:sProjFileKey ]["projects"][ l:lProjects[j] ]["pathsRoot"]
+
+                     for iPassNum in range(0, 1)
+
+                        if iPassNum == 0
+                           let iOuterPrjNum = i
+                           let lPathsRoot_1 = lPathsRoot_i
+                           let lPathsRoot_2 = lPathsRoot_j
+                        elseif iPassNum == 1
+                           let iOuterPrjNum = j
+                           let lPathsRoot_1 = lPathsRoot_j
+                           let lPathsRoot_2 = lPathsRoot_i
+                        endif
+
+                        for sCurPathRoot_1 in lPathsRoot_1
+                           let boolSubdir = 1
+                           for sCurPathRoot_2 in lPathsRoot_2
+                              if !dfrank#util#IsFileInSubdirSimple(sCurPathRoot_2, sCurPathRoot_1)
+                                 let boolSubdir = 0
+                                 break
+                              endif
+                           endfor
+                           if boolSubdir
+                              " project '2' is in subdir of project '1'!
+                              " so, remove project '1'
+                              unlet l:lProjects[iOuterPrjNum]
+                              let l:iProjectsAddedCnt = l:iProjectsAddedCnt - 1
+                              let boolCheckNested = 1
+                              break
+                           endif
+                        endfor
+
+                        if boolCheckNested
+                           break
+                        endif
+
+                     endfor
+
+
+                     if boolCheckNested
+                        break
+                     endif
+
+                  endfor
+
+                  if boolCheckNested
+                     break
+                  endif
+
+               endfor
+            endwhile
+         endif
+
+
          if (l:iProjectsAddedCnt > 1)
             " it should never happen,
             " because just one project for file is supported now, so,
