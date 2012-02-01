@@ -1583,8 +1583,8 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   if (len(l:dirNameMatch) > 0)
                      " get name of directory
 
-                     let l:sDirName = simplify(a:indexerFile.'/../'.l:dirNameMatch[1])
-                     let l:sDirName = dfrank#util#GetPathLastItem(l:sDirName)
+                     let l:sDirName = simplify(fnamemodify(a:indexerFile, ":p:h").'/'.l:dirNameMatch[1])
+                     let l:sDirName = fnamemodify(l:sDirName, ":t")
                      let l:sProjName = substitute(l:sProjName, l:sPatternTmpVar, l:sDirName, '')
                   else
                      let l:sProjName = substitute(l:sProjName, l:sPatternTmpVar, '_unknown_var_', '')
