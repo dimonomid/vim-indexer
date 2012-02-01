@@ -1094,18 +1094,13 @@ function! <SID>IndexerInfo()
          echo '* Background tags generation: NO. '.<SID>_GetBackgroundComment()
       endif
       echo '* Projects indexed: '.l:sProjects
-      if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
-         echo '* Files indexed: '.l:sFilesForCtags
-         " Type :IndexerFiles to list'
-         echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
-         ".join(s:dParseGlobal.not_exist, ', ')
-      endif
-
       echo "* Root paths: ".l:sPathsRoot
       echo "* Paths for ctags: ".l:sPathsForCtags
-      if l:iFilesCnt > 0
-         echo "* Files for ctags: ".l:sFilesForCtags
+      echo "* Files for ctags: ".l:sFilesForCtags
+      if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
+         echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
       endif
+
 
       echo '* Paths (with all subfolders): '.&path
       echo '* Tags file: '.&tags
