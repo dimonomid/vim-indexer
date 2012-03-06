@@ -1644,7 +1644,12 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   for l:sPrj in l:lProjects
                      if (isdirectory(l:sPrj))
                         "call add(l:lIndexerFilesList, '['.substitute(l:sPrj, '^.*[\\/]\([^\\/]\+\)$', '\1', '').']')
-                        call add(l:lIndexerFilesList, '['.l:sPrj.']')
+
+                        let l:sPrjName = l:sPrj
+                        if g:indexer_shortProjParentNames
+                           let l:sPrjName = fnamemodify(l:sPrjName, ':t')
+                        endif
+                        call add(l:lIndexerFilesList, '['.l:sPrjName.']')
 
                         " adding options
                         for l:sCurOptionKey in keys(l:dProjectsParentOptions)
@@ -2291,6 +2296,10 @@ endif
 
 if !exists('g:indexer_disableIndexerFilesDirsWarning')
    let g:indexer_disableIndexerFilesDirsWarning = 0
+endif
+
+if !exists('g:indexer_shortProjParentNames')
+   let g:indexer_shortProjParentNames = 0
 endif
 
 
