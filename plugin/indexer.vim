@@ -224,7 +224,9 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
    " before changing tags and path, let's restore default ones.
    "  (NOT global defaults, but default for current .vimprj root)
    let &tags = g:vimprj#dRoots[ a:sVimprjKey ]['indexer']['sTagsDefault']
-   let &path = g:vimprj#dRoots[ a:sVimprjKey ]['indexer']['sPathDefault']
+   if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
+      let &path = g:vimprj#dRoots[ a:sVimprjKey ]['indexer']['sPathDefault']
+   endif
 
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
