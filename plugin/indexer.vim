@@ -81,31 +81,6 @@
 "     ["versionFirstLine"] - output for ctags --version, but first line only.
 "
 "
-" TODO: move this description to vimprj plugin
-"
-" g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
-"     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY KEY
-"        ["cd_path"] - path for CD. Can't be empty.
-"        ["proj_root"] - $INDEXER_PROJECT_ROOT. Can be empty (for "default")
-"        ["path"] - path to .vimprj dir. Actually, this is
-"                   "proj_root"."/.vimprj", if "proj_root" isn't empty.
-"        ["mode"] - "IndexerFile" or "ProjectFile"
-"        ..... - many indexer options like "indexerListFilename", etc.
-"
-"
-" g:vimprj#dFiles - DICTIONARY with info about all regular files
-"     [  <bufnr('%')>  ] - DICTIONARY KEY
-"        ["sVimprjKey"] - key for g:vimprj#dRoots
-"        ["projects"] - LIST 
-"                             NOTE!!!
-"                             At this moment only ONE project
-"                             is allowed for each file
-"           [0, 1, 2, ...] - LIST KEY. At this moment, only 0 is available
-"              ["file"] - key for s:dProjFilesParsed
-"              ["name"] - name of project
-"           
-
-"        
 "  
 
 if v:version < 700
