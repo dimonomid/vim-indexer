@@ -1,3 +1,10 @@
+*) BUG: if project is defined like that  
+
+   IDAMC=~/workspace/idamc/{
+ 
+   then Indexer failed to parse it. We need to add spaces before "{" character.
+   look for jonasdiemer@gmail.com messages in my gmail account for details.
+
 *) Issue: if in .indexer_files add some FILE (not dir), then tags WILL be
 generated for this file, but if you open this file, then no projects will be
 associated with it.
