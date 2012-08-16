@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (dimon.frank@gmail.com)
-" Version:     4.14
+" Version:     4.15
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -90,7 +90,7 @@ endif
 
 " Dependencies
 
-let s:iVimprj_min_version = 106
+let s:iVimprj_min_version = 108
 let s:iDfrankUtil_min_version = 100
 
 " Dependency functions
@@ -186,7 +186,7 @@ endif
 
 " all dependencies is ok
 
-let g:iIndexerVersion = 414
+let g:iIndexerVersion = 415
 let g:loaded_indexer  = 1
 
 
@@ -235,9 +235,28 @@ function! g:vimprj#dHooks['NeedSkipBuffer']['indexer'](dParams)
 
    " skip specified projecs file (g:indexer_projectsSettingsFilename)
    if exists("g:vimprj#sCurVimprjKey")
-      if l:sFilename == a:dParams['dVimprjRootParams'].projectsSettingsFilename
+
+      "let sTmp = s:def_projectsSettingsFilename
+      "if exists("a:dParams['dVimprjRootParams']")
+         "let sTmp = a:dParams['dVimprjRootParams'].projectsSettingsFilename
+      "endif
+      
+      "if l:sFilename == lTmp
+         "return 1
+      "endif
+
+
+      " we do not take a:dParams['dVimprjRootParams'].projectsSettingsFilename
+      " because in this hook these settings are taken from PREVIOUS file,
+      " not new one, so this is completely wrong.
+      " To be honest, we need to make s:def_projectsSettingsFilename not
+      " changeable between different projects.
+
+      if l:sFilename == s:def_projectsSettingsFilename
          return 1
       endif
+
+
    endif
 
    return 0
