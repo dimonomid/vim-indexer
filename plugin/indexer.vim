@@ -789,9 +789,12 @@ function! Indexer_OnAsyncCommandComplete(temp_file_name)
 
    call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
 
-   "exec "split " . a:temp_file_name
-   "wincmd w
-   "redraw
+   if !has("gui_running")
+      " clear and redraw to remove screen clear 
+      " after running external program
+      redraw!
+   endif
+   return ""
 
 endfunction
 
