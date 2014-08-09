@@ -579,6 +579,7 @@ function! g:vimprj#dHooks['OnAddNewVimprjRoot']['indexer'](dParams)
 
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'] = {}
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useSedWhenAppend"]                 = g:indexer_useSedWhenAppend
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["autoUpdateTags"]                   = g:indexer_autoUpdateTags
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["indexerListFilename"]              = expand(g:indexer_indexerListFilename)
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectsSettingsFilename"]         = expand(g:indexer_projectsSettingsFilename)
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectName"]                      = g:indexer_projectName
@@ -601,6 +602,7 @@ endfunction
 
 function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let g:indexer_useSedWhenAppend                 = s:def_useSedWhenAppend
+   let g:indexer_autoUpdateTags                   = s:def_autoUpdateTags
    let g:indexer_indexerListFilename              = s:def_indexerListFilename
    let g:indexer_projectsSettingsFilename         = s:def_projectsSettingsFilename
    let g:indexer_projectName                      = s:def_projectName
@@ -628,7 +630,8 @@ function! g:vimprj#dHooks['OnBufSave']['indexer'](dParams)
 
    let l:iFileNum = a:dParams['iFileNum']
 
-   call <SID>UpdateTagsForFile(l:iFileNum, {'full_rebuild': 0})
+   "call confirm(s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename);
+   call <SID>UpdateTagsForFile(l:iFileNum, {'full_rebuild': 0, 'ignore_autoUpdateTags_option' : 0})
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
@@ -1082,12 +1085,15 @@ function! <SID>IndexerInfo()
          endif
       endif
       echo '* At file save: '.
-               \ (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave 
-               \     ? (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].useSedWhenAppend 
-               \           ? 'remove tags for saved file by SED, and ' 
-               \           : ''
-               \       ).'just append tags' 
-               \     : 'rebuild tags for whole project'
+               \ (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].autoUpdateTags
+               \     ? (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave 
+               \        ? (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].useSedWhenAppend 
+               \              ? 'remove tags for saved file by SED, and ' 
+               \              : ''
+               \          ).'just append tags' 
+               \        : 'rebuild tags for whole project'
+               \     )
+               \     : 'do nothing'
                \ )
       if <SID>_IsBackgroundEnabled()
          echo '* Background tags generation: YES'
@@ -2044,7 +2050,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
    "     tagsFilename - имя файла тегов
    for l:sCurProjName in keys(s:dProjFilesParsed[ a:sProjFileKey ]["projects"])
       let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
-      let l:dCurProject["boolIndexed"] = 0
+      let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
 
       "let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
       "let l:sTagsFile = s:tagsDirname.'/'.l:sTagsFileWOPath
@@ -2075,6 +2081,15 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
       let l:dCurProject["tagsFilename"] = l:sTagsFile
       let l:dCurProject["tagsFilenameEscaped"]=substitute(l:sTagsFile, ' ', '\\\\\\ ', 'g')
+
+      let l:dCurProject["boolIndexed"] = 0
+
+      if !g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].autoUpdateTags && filereadable(l:sTagsFile)
+         " we have option not to update tags file unless it doesn't exist or
+         " user haven't asked it explicitly
+         let l:dCurProject["boolIndexed"] = 1
+         "call confirm('set as indexed')
+      endif
 
       let l:sPathsAll = ""
       for l:sPath in s:dProjFilesParsed[a:sProjFileKey]["projects"][l:sCurProjName].paths
@@ -2138,40 +2153,45 @@ function! <SID>UpdateTagsForFile(iFileNum, dParams)
          endif
       endif
 
-      if l:boolJustAppendTags
-         " just append existing tags
-         call <SID>UpdateTagsForProject(
-                  \     l:lFileProjs.file,
-                  \     l:lFileProjs.name,
-                  \     l:sSavedFile,
-                  \     g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
-                  \  )
-      else
-         " rebuild tags for a whole project
+      if g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].autoUpdateTags || a:dParams['ignore_autoUpdateTags_option']
+         "call confirm('update')
+         if l:boolJustAppendTags
+            " just append existing tags
+            call <SID>UpdateTagsForProject(
+                     \     l:lFileProjs.file,
+                     \     l:lFileProjs.name,
+                     \     l:sSavedFile,
+                     \     g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
+                     \  )
+         else
+            " rebuild tags for a whole project
 
-         " if IndexerFile and FILES mode and we need to do full_rebuild,
-         " then we need to re-expand all wildcards and write new filelist if needed.
-         " but NOTE: this is a deprecate mode. If you use .indexer_files, then
-         " you should use DIRS mode.
+            " if IndexerFile and FILES mode and we need to do full_rebuild,
+            " then we need to re-expand all wildcards and write new filelist if needed.
+            " but NOTE: this is a deprecate mode. If you use .indexer_files, then
+            " you should use DIRS mode.
 
-         if (           !<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ l:sVimprjKey ]['indexer'])
-                  \     && s:dProjFilesParsed[ l:lFileProjs.file ]['type'] == 'IndexerFile'
-                  \     && a:dParams['full_rebuild']
-                  \  )
-            call <SID>ExpandAllWildcards(l:dCurProject)
-            if !empty(l:dCurProject['sFilelistFile'])
-               " write filelist
-               call <SID>GenerateFilelist(l:dCurProject, l:dCurProject['sFilelistFile'])
+            if (           !<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ l:sVimprjKey ]['indexer'])
+                     \     && s:dProjFilesParsed[ l:lFileProjs.file ]['type'] == 'IndexerFile'
+                     \     && a:dParams['full_rebuild']
+                     \  )
+               call <SID>ExpandAllWildcards(l:dCurProject)
+               if !empty(l:dCurProject['sFilelistFile'])
+                  " write filelist
+                  call <SID>GenerateFilelist(l:dCurProject, l:dCurProject['sFilelistFile'])
+               endif
             endif
+
+
+            call <SID>UpdateTagsForProject(
+                     \     l:lFileProjs.file,
+                     \     l:lFileProjs.name,
+                     \     "",
+                     \     g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
+                     \  )
          endif
-
-
-         call <SID>UpdateTagsForProject(
-                  \     l:lFileProjs.file,
-                  \     l:lFileProjs.name,
-                  \     "",
-                  \     g:vimprj#dRoots[ l:sVimprjKey ]['indexer']
-                  \  )
+      else
+         "call confirm('do nothing')
       endif
 
    endfor
@@ -2319,6 +2339,10 @@ if !exists('g:indexer_useSedWhenAppend')
    let g:indexer_useSedWhenAppend = 1
 endif
 
+if !exists('g:indexer_autoUpdateTags')
+   let g:indexer_autoUpdateTags = 1
+endif
+
 if !exists('g:indexer_indexerListFilename')
    let g:indexer_indexerListFilename = $HOME.'/.indexer_files'
 endif
@@ -2373,6 +2397,7 @@ endif
 
 
 let s:def_useSedWhenAppend                  = g:indexer_useSedWhenAppend
+let s:def_autoUpdateTags                    = g:indexer_autoUpdateTags
 let s:def_indexerListFilename               = expand(g:indexer_indexerListFilename)
 let s:def_projectsSettingsFilename          = expand(g:indexer_projectsSettingsFilename)
 let s:def_projectName                       = g:indexer_projectName
@@ -2403,7 +2428,7 @@ if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
 if exists(':IndexerRebuild') != 2
-   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile(bufnr('%'), {'full_rebuild': 1})
+   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile(bufnr('%'), {'full_rebuild': 1, 'ignore_autoUpdateTags_option' : 1})
 endif
 
 call <SID>Indexer_DetectCtags()
