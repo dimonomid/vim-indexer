@@ -579,7 +579,7 @@ function! g:vimprj#dHooks['OnAddNewVimprjRoot']['indexer'](dParams)
 
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer'] = {}
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["useSedWhenAppend"]                 = g:indexer_useSedWhenAppend
-   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["autoUpdateTags"]                   = g:indexer_autoUpdateTags
+   let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["dontUpdateTagsIfFileExists"]       = g:indexer_dontUpdateTagsIfFileExists
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["indexerListFilename"]              = expand(g:indexer_indexerListFilename)
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectsSettingsFilename"]         = expand(g:indexer_projectsSettingsFilename)
    let g:vimprj#dRoots[ l:sVimprjKey ]['indexer']["projectName"]                      = g:indexer_projectName
@@ -602,7 +602,7 @@ endfunction
 
 function! g:vimprj#dHooks['SetDefaultOptions']['indexer'](dParams)
    let g:indexer_useSedWhenAppend                 = s:def_useSedWhenAppend
-   let g:indexer_autoUpdateTags                   = s:def_autoUpdateTags
+   let g:indexer_dontUpdateTagsIfFileExists       = s:def_dontUpdateTagsIfFileExists
    let g:indexer_indexerListFilename              = s:def_indexerListFilename
    let g:indexer_projectsSettingsFilename         = s:def_projectsSettingsFilename
    let g:indexer_projectName                      = s:def_projectName
@@ -631,7 +631,7 @@ function! g:vimprj#dHooks['OnBufSave']['indexer'](dParams)
    let l:iFileNum = a:dParams['iFileNum']
 
    "call confirm(s:dProjFilesParsed[ a:sProjFileKey ]["projects"][ a:sProjName ].tagsFilename);
-   call <SID>UpdateTagsForFile(l:iFileNum, {'full_rebuild': 0, 'ignore_autoUpdateTags_option' : 0})
+   call <SID>UpdateTagsForFile(l:iFileNum, {'full_rebuild': 0, 'ignore_dontUpdateTagsIfFileExists_option' : 0})
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnBufSave__', {})
 endfunction
@@ -1085,7 +1085,7 @@ function! <SID>IndexerInfo()
          endif
       endif
       echo '* At file save: '.
-               \ (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].autoUpdateTags
+               \ (!g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].dontUpdateTagsIfFileExists
                \     ? (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].ctagsJustAppendTagsAtFileSave 
                \        ? (g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].useSedWhenAppend 
                \              ? 'remove tags for saved file by SED, and ' 
@@ -2084,7 +2084,7 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
 
       let l:dCurProject["boolIndexed"] = 0
 
-      if !g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].autoUpdateTags && filereadable(l:sTagsFile)
+      if g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].dontUpdateTagsIfFileExists && filereadable(l:sTagsFile)
          " we have option not to update tags file unless it doesn't exist or
          " user haven't asked it explicitly
          let l:dCurProject["boolIndexed"] = 1
@@ -2153,7 +2153,7 @@ function! <SID>UpdateTagsForFile(iFileNum, dParams)
          endif
       endif
 
-      if g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].autoUpdateTags || a:dParams['ignore_autoUpdateTags_option']
+      if !g:vimprj#dRoots[ l:sVimprjKey ]['indexer'].dontUpdateTagsIfFileExists || a:dParams['ignore_dontUpdateTagsIfFileExists_option']
          "call confirm('update')
          if l:boolJustAppendTags
             " just append existing tags
@@ -2339,8 +2339,8 @@ if !exists('g:indexer_useSedWhenAppend')
    let g:indexer_useSedWhenAppend = 1
 endif
 
-if !exists('g:indexer_autoUpdateTags')
-   let g:indexer_autoUpdateTags = 1
+if !exists('g:indexer_dontUpdateTagsIfFileExists')
+   let g:indexer_dontUpdateTagsIfFileExists = 0
 endif
 
 if !exists('g:indexer_indexerListFilename')
@@ -2397,7 +2397,7 @@ endif
 
 
 let s:def_useSedWhenAppend                  = g:indexer_useSedWhenAppend
-let s:def_autoUpdateTags                    = g:indexer_autoUpdateTags
+let s:def_dontUpdateTagsIfFileExists        = g:indexer_dontUpdateTagsIfFileExists
 let s:def_indexerListFilename               = expand(g:indexer_indexerListFilename)
 let s:def_projectsSettingsFilename          = expand(g:indexer_projectsSettingsFilename)
 let s:def_projectName                       = g:indexer_projectName
@@ -2428,7 +2428,7 @@ if exists(':IndexerFiles') != 2
    command -nargs=? -complete=file IndexerFiles call <SID>IndexerFilesList()
 endif
 if exists(':IndexerRebuild') != 2
-   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile(bufnr('%'), {'full_rebuild': 1, 'ignore_autoUpdateTags_option' : 1})
+   command -nargs=? -complete=file IndexerRebuild call <SID>UpdateTagsForFile(bufnr('%'), {'full_rebuild': 1, 'ignore_dontUpdateTagsIfFileExists_option' : 1})
 endif
 
 call <SID>Indexer_DetectCtags()
