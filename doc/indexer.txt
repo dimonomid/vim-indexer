@@ -1,14 +1,14 @@
 *indexer.txt* Plugin for automatically index project files using ctags
-              and keep tags up-to-date.
-              For Vim 7.x version
+            and keep tags up-to-date.
+            For Vim 7.x version
 
 
 
                      By Dmitry Frank
-                  dimon.frank@gmail.com
+                   mail@dmitryfrank.com
 
 Firstly: if you have any questions about this plugin, feel free
-to email me: dimon.frank@gmail.com
+to email me: mail@dmitryfrank.com
 
 
                                           *indexer* *indexer-plugin*
@@ -25,7 +25,7 @@ to email me: dimon.frank@gmail.com
      Thanks......................................|indexer-thanks|
 
 
-Please note: there's some dependencies. Please read |indexer-dependencies|.
+Please note: there're some dependencies. Please read |indexer-dependencies|.
 
                                   * * *
 
@@ -495,7 +495,8 @@ You can always see the last ctags command by typing >
 ========================================================================
 THANKS                                                  *indexer-thanks*
 
-There's some people i'd like to say thanks for help with make Indexer better:
+There are some people I'd like to say thanks for helping me to make Indexer
+better:
 
 * Makoto Nokata
 * Julian Kooij
