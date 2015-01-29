@@ -1113,11 +1113,16 @@ function! <SID>GetCtagsCommand(dParams)
    " tags file becomes damaged because of Sed's output is always with UNIX
    " line-ends. Ctags at Windows fails with this file.
    "
-   if (a:dParams['dIndexerParams'].ctagsJustAppendTagsAtFileSave && a:dParams['dIndexerParams'].useSedWhenAppend && (has('win32') || has('win64')))
-      let l:sSortCode = '--sort=no'
-   else
-      let l:sSortCode = '--sort=yes'
-   endif
+   "COMMENTED because I just tried latest sed from cygwin, and it seems
+   "working
+   "if (a:dParams['dIndexerParams'].ctagsJustAppendTagsAtFileSave && a:dParams['dIndexerParams'].useSedWhenAppend && (has('win32') || has('win64')))
+      "let l:sSortCode = '--sort=no'
+   "else
+      "let l:sSortCode = '--sort=yes'
+   "endif
+   
+   " So, now sorting is always enabled
+   let l:sSortCode = '--sort=yes'
 
    let l:sTagsFile = '"'.a:dParams.sTagsFile.'"'
    let l:sCmd = s:dCtagsInfo['executable']
