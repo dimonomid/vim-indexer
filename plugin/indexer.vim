@@ -1,6 +1,6 @@
 "=============================================================================
 " File:        indexer.vim
-" Author:      Dmitry Frank (dimon.frank@gmail.com)
+" Author:      Dmitry Frank (mail@dmitryfrank.com)
 " Version:     4.15
 "=============================================================================
 " See documentation in accompanying help file
