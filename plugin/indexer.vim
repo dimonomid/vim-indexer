@@ -1,7 +1,7 @@
 "=============================================================================
 " File:        indexer.vim
 " Author:      Dmitry Frank (mail@dmitryfrank.com)
-" Version:     4.15
+" Version:     4.16
 "=============================================================================
 " See documentation in accompanying help file
 " You may use this code in whatever way you see fit.
@@ -146,7 +146,7 @@ endif
 
 " all dependencies is ok
 
-let g:iIndexerVersion = 415
+let g:iIndexerVersion = 416
 let g:loaded_indexer  = 1
 
 
