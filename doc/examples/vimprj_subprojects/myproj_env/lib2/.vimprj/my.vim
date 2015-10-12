@@ -1,4 +1,7 @@
 
+" See the article http://dmitryfrank.com/articles/vim_project_code_navigation
+" for details on advanced Indexer + Vimprj usage
+
 " path to .vimprj folder
 let s:sVimprjPath = expand('<sfile>:p:h')
 
