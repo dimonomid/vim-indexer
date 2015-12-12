@@ -41,7 +41,11 @@
 "     ["versionFirstLine"] - output for ctags --version, but first line only.
 "
 "
-"  
+"
+
+if !empty($DISABLE_INDEXER)
+   finish
+endif
 
 if v:version < 700
    call confirm("indexer error: You need Vim 7.0 or higher")
