@@ -22,6 +22,7 @@
 "              ["options"]
 "              ["sFilelistFile"]
 "              ["paths"]
+"              ["includes"]
 "        ["filename"] = (for example) "/home/user/.indexer_files"
 "        ["type"] - "IndexerFile" or "ProjectFile"
 "        ["sVimprjKey"] - key for g:vimprj#dRoots
@@ -169,6 +170,20 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
 
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
+
+      " Added included project tags, if any.
+      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
+      for l:sProjectName in keys(l:dProjects)
+
+         let l:dProjectIncludes = l:dProjects[l:sProjectName].includes
+         if (!empty(l:dProjectIncludes))
+            for l:sIncProjName in l:dProjectIncludes
+               exec "set tags+=". l:dProjects[ l:sIncProjName ]["tagsFilenameEscaped"]
+            endfor
+         endif
+
+      endfor
+
       if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
          exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
       endif
@@ -488,6 +503,20 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
             endif
          endif
 
+         " Generate tags for each included and not-yet-indexed project, if any.
+         let l:dProjects = s:dProjFilesParsed[ l:sProjFileKey ].projects
+         for l:sProjectName in keys(l:dProjects)
+
+            let l:dProjectIncludes = l:dProjects[l:sProjectName].includes
+            if (!empty(l:dProjectIncludes))
+               for l:sIncProjName in l:dProjectIncludes
+                  if (!l:dProjects[ l:sIncProjName ].boolIndexed)
+                     call <SID>UpdateTagsForProject(l:sProjFileKey, l:sIncProjName, "", a:dParams['dVimprjRootParams'])
+                  endif
+               endfor
+            endif
+
+         endfor
 
       else    " if projectName != ""
          " User has explicitly specified the project to index
@@ -972,6 +1001,7 @@ function! <SID>IndexerInfo()
    let l:iFilesNotFoundCnt = 0
 
    let l:sFilesForCtags = ""
+   let l:sIncludedProjects = ""
 
    for l:lProjects in g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]
       let l:dCurProject = s:dProjFilesParsed[ l:lProjects.file ]["projects"][ l:lProjects.name ]
@@ -999,6 +1029,10 @@ function! <SID>IndexerInfo()
          let l:sFilesForCtags = 'there''s '.l:iFilesCnt.' files. Type :IndexerFiles for list.'
       endif
 
+      if !empty(l:sIncludedProjects)
+         let l:sIncludedProjects .= ", "
+      endif
+      let l:sIncludedProjects .= join(l:dCurProject.includes, ', ')
    endfor
 
    call <SID>Indexer_DetectCtags()
@@ -1045,13 +1079,18 @@ function! <SID>IndexerInfo()
       else
          echo '* Background tags generation: NO. '.<SID>_GetBackgroundComment()
       endif
-      echo '* Projects indexed: '.l:sProjects
+      if (empty(l:sIncludedProjects))
+         echo '* Projects indexed: '.l:sProjects
+      else
+         echo '* Projects indexed: '.l:sProjects.' ['.l:sIncludedProjects.']'
+      endif
       echo "* Root paths: ".l:sPathsRoot
       echo "* Paths for ctags: ".l:sPathsForCtags
       echo "* Files for ctags: ".l:sFilesForCtags
       if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
          echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
       endif
+      echo "* Included projects: ".l:sIncludedProjects
 
 
       echo '* Paths (with all subfolders): '.&path
@@ -1462,6 +1501,7 @@ endfunction
 "                           [pathsForCtags]
 "                           [pathsRoot]
 "                           [options]
+"                           [includes]
 "
 " dResult[<project_2_name>] [files]
 "                           [wildcards]
@@ -1471,6 +1511,7 @@ endfunction
 "                           [pathsForCtags]
 "                           [pathsRoot]
 "                           [options]
+"                           [includes]
 " ...
 "
 " @param aLines 
@@ -1497,6 +1538,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
    "let l:i = 0
+   let l:sPattern_include = '\v^\s*include\s*(.*)'
 
    for l:sLine in l:aLines
 
@@ -1563,7 +1605,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
                if l:boolInNeededProject
                   let l:sCurProjName = l:sProjName
-                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'includes': [] }
                endif
             endif
          else
@@ -1583,6 +1625,40 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   " OPTION in usual project
                   let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
                endif
+            endif
+
+            " Look for include file(s)
+            " Example:
+            " include /home/user/my_library_project/indexer_files
+            " include ./indexer_files
+            "
+            " Note: A relative path is relative to the indexer_files directory.
+            let l:includeMatch = matchlist(l:sLine, l:sPattern_include)
+
+            if (len(l:includeMatch) > 1)
+               let l:sIncludeFile = dfrank#util#ParsePath(dfrank#util#Trim(l:includeMatch[1]))
+
+               " Handle relative include file
+               if (!dfrank#util#IsAbsolutePath(l:sIncludeFile))
+                  let l:sIndexerDir = fnamemodify(a:indexerFile, ":p:h")
+                  let l:sIncludeFile = simplify(l:sIndexerDir . "/" . l:sIncludeFile)
+               endif
+
+               " Make sure it's a file and readable.
+               if (!isdirectory(l:sIncludeFile) && filereadable(l:sIncludeFile))
+                  let l:aIncLines = readfile(l:sIncludeFile)
+                  let l:dIncResult = {}
+                  let l:dIncResult = <SID>GetDirsAndFilesFromIndexerList(l:aIncLines, a:indexerFile, l:dIncResult, a:dIndexerParams)
+
+                  " Add name of included project
+                  let l:dResult[l:sCurProjName].includes = dfrank#util#ConcatLists(l:dResult[l:sCurProjName].includes, keys(l:dIncResult))
+
+                  " Add included project to this project
+                  call extend(l:dResult, l:dIncResult)
+               else
+                  call confirm("Indexer warning:\nInvalid include '".l:includeMatch[1]."'")
+               endif
+
             else
 
                if l:boolInProjectsParentSection
@@ -1645,7 +1721,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   " looks like there's path
                   if l:sCurProjName == ''
                      let l:sCurProjName = 'noname'
-                     let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+                     let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'includes': [] }
                   endif
 
                   " we should separately expand every variable
@@ -1889,7 +1965,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, dIndexerParams)
 
          if l:boolInNeededProject && (l:iOpenedBraces == l:iOpenedBracesAtProjectStart)
             let l:sCurProjName = l:myMatch[1]
-            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'includes': [] }
          endif
 
          let l:sLastFoundPath = l:myMatch[2]
