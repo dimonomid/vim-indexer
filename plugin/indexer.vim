@@ -22,6 +22,7 @@
 "              ["options"]
 "              ["sFilelistFile"]
 "              ["paths"]
+"              ["libraries"]
 "        ["filename"] = (for example) "/home/user/.indexer_files"
 "        ["type"] - "IndexerFile" or "ProjectFile"
 "        ["sVimprjKey"] - key for g:vimprj#dRoots
@@ -169,6 +170,18 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
 
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
       exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
+
+      " Add library project tags, if any.
+      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
+      for l:sProjectName in keys(l:dProjects)
+
+         let l:dProjectLibraries = l:dProjects[l:sProjectName].libraries
+         for l:sLibProjName in l:dProjectLibraries
+            exec "set tags+=". l:dProjects[ l:sLibProjName ]["tagsFilenameEscaped"]
+         endfor
+
+      endfor
+
       if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
          exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
       endif
@@ -488,6 +501,23 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
             endif
          endif
 
+         " Check libraries first
+         for l:sCurProj in g:vimprj#dFiles[ l:iFileNum ].projects
+            call <SID>CheckLibraries(l:sCurProj.name, s:dProjFilesParsed[ l:sCurProj.file ]["projects"])
+         endfor
+
+         " Generate tags for each not-yet-indexed library project, if any.
+         let l:dProjects = s:dProjFilesParsed[ l:sProjFileKey ].projects
+         for l:sProjectName in keys(l:dProjects)
+
+            let l:dProject = l:dProjects[l:sProjectName]
+            for l:sLibProjName in l:dProject.libraries
+               if (!l:dProjects[ l:sLibProjName ].boolIndexed)
+                  call <SID>UpdateTagsForProject(l:sProjFileKey, l:sLibProjName, "", a:dParams['dVimprjRootParams'])
+               endif
+            endfor
+
+         endfor
 
       else    " if projectName != ""
          " User has explicitly specified the project to index
@@ -972,6 +1002,7 @@ function! <SID>IndexerInfo()
    let l:iFilesNotFoundCnt = 0
 
    let l:sFilesForCtags = ""
+   let l:sLibraryProjects = ""
 
    for l:lProjects in g:vimprj#dFiles[ g:vimprj#iCurFileNum ]["projects"]
       let l:dCurProject = s:dProjFilesParsed[ l:lProjects.file ]["projects"][ l:lProjects.name ]
@@ -999,6 +1030,10 @@ function! <SID>IndexerInfo()
          let l:sFilesForCtags = 'there''s '.l:iFilesCnt.' files. Type :IndexerFiles for list.'
       endif
 
+      if !empty(l:sLibraryProjects)
+         let l:sLibraryProjects .= ", "
+      endif
+      let l:sLibraryProjects .= join(l:dCurProject.libraries, ', ')
    endfor
 
    call <SID>Indexer_DetectCtags()
@@ -1045,13 +1080,18 @@ function! <SID>IndexerInfo()
       else
          echo '* Background tags generation: NO. '.<SID>_GetBackgroundComment()
       endif
-      echo '* Projects indexed: '.l:sProjects
+      if (empty(l:sLibraryProjects))
+         echo '* Projects indexed: '.l:sProjects
+      else
+         echo '* Projects indexed: '.l:sProjects.' ['.l:sLibraryProjects.']'
+      endif
       echo "* Root paths: ".l:sPathsRoot
       echo "* Paths for ctags: ".l:sPathsForCtags
       echo "* Files for ctags: ".l:sFilesForCtags
       if (!<SID>_UseDirsInsteadOfFiles(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer']))
          echo "* Files not found: there's ".l:iFilesNotFoundCnt.' non-existing files. ' 
       endif
+      echo "* Library projects: ".l:sLibraryProjects
 
 
       echo '* Paths (with all subfolders): '.&path
@@ -1453,6 +1493,52 @@ endfunction
 "                         FUNCTIONS TO PARSE PROJECT FILE OR INDEXER FILE
 " ************************************************************************************************
 
+function! <SID>CheckLibraries(sProjectName, dProject)
+   let l:aStack = []
+   let l:aDiscovered = []
+   let l:lLibDeleteList = []
+
+   " Push project name on working stack
+   call add(l:aStack, a:sProjectName)
+
+   while (!empty(l:aStack))
+      let l:v = remove(l:aStack, -1)
+
+      if (index(l:aDiscovered, l:v) == -1)
+         call add(l:aDiscovered, l:v)
+
+         for l:w in a:dProject[l:v].libraries
+            " Check for existing library project
+            if (!has_key(a:dProject, l:w))
+               " Not available, so queue reference for removal
+               let l:lLibDeleteList = dfrank#util#ConcatLists(l:lLibDeleteList, [[l:v, l:w]])
+
+               call confirm("Indexer warning:\nLibrary \"".l:w."\" in [".l:v."] not found!")
+            else
+               " Check if already 'discovered' or already on the working stack
+               if ( (index(l:aDiscovered, l:w) == -1) && (index(l:aStack, l:w) == -1) )
+                  " New, so push on stack
+                  call add(l:aStack, l:w)
+               else
+                  " 'Fix' loop by queuing reference for removal
+                  let l:lLibDeleteList = dfrank#util#ConcatLists(l:lLibDeleteList, [[l:v, l:w]])
+
+                  call confirm("Indexer warning:\nLibrary loop found in [".l:v."] to \"".l:w."\"")
+               endif
+            endif
+         endfor
+      endif
+
+   endwhile
+
+   " Delete the invalid library reference(s)
+   for l:sLibDelEntry in l:lLibDeleteList
+      let l:i = index(a:dProject[ l:sLibDelEntry[0] ].libraries, l:sLibDelEntry[1])
+      unlet a:dProject[ l:sLibDelEntry[0] ].libraries[l:i]
+   endfor
+
+endfunction
+
 " returns dictionary:
 " dResult[<project_1_name>] [files]
 "                           [wildcards]
@@ -1462,6 +1548,7 @@ endfunction
 "                           [pathsForCtags]
 "                           [pathsRoot]
 "                           [options]
+"                           [libraries]
 "
 " dResult[<project_2_name>] [files]
 "                           [wildcards]
@@ -1471,6 +1558,7 @@ endfunction
 "                           [pathsForCtags]
 "                           [pathsRoot]
 "                           [options]
+"                           [libraries]
 " ...
 "
 " @param aLines 
@@ -1563,7 +1651,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
                if l:boolInNeededProject
                   let l:sCurProjName = l:sProjName
-                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+                  let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'libraries': [] }
                endif
             endif
          else
@@ -1573,16 +1661,27 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
             let l:myMatch = matchlist(l:sLine, l:sPattern_option)
 
             if (len(l:myMatch) > 0)
-               if l:boolInProjectsParentSection
+               if (l:myMatch[1] == "library")
+                  " Add name of library project and check for duplicates
+                  let l:sLibName = l:myMatch[2]
+                  if (index(l:dResult[l:sCurProjName].libraries, l:sLibName) == -1)
+                     call add(l:dResult[l:sCurProjName].libraries, l:sLibName)
+                  else
+                     call confirm('Indexer warning: duplicate library option in '.a:indexerFile.': '.l:sLibName)
+                  endif
+               else
+                  if l:boolInProjectsParentSection
 
-                  " OPTION in parsing one project parent
-                  "call add(l:lProjectsParentOptions, l:myMatch[0])
-                  let l:dProjectsParentOptions[l:myMatch[1]] = l:myMatch[2]
+                     " OPTION in parsing one project parent
+                     "call add(l:lProjectsParentOptions, l:myMatch[0])
+                     let l:dProjectsParentOptions[l:myMatch[1]] = l:myMatch[2]
 
-               elseif l:boolInNeededProject
-                  " OPTION in usual project
-                  let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
+                  elseif l:boolInNeededProject
+                     " OPTION in usual project
+                     let l:dResult[l:sCurProjName]['options'][ l:myMatch[1] ] = l:myMatch[2]
+                  endif
                endif
+
             else
 
                if l:boolInProjectsParentSection
@@ -1645,7 +1744,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   " looks like there's path
                   if l:sCurProjName == ''
                      let l:sCurProjName = 'noname'
-                     let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+                     let l:dResult[l:sCurProjName] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'libraries': [] }
                   endif
 
                   " we should separately expand every variable
@@ -1889,7 +1988,7 @@ function! <SID>GetDirsAndFilesFromProjectFile(projectFile, dIndexerParams)
 
          if l:boolInNeededProject && (l:iOpenedBraces == l:iOpenedBracesAtProjectStart)
             let l:sCurProjName = l:myMatch[1]
-            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {} }
+            let l:dResult[l:myMatch[1]] = { 'wildcards': [], 'files': [], 'sFilelistFile': '', 'paths': [], 'not_exist': [], 'pathsForCtags': [], 'pathsRoot': [], 'options': {}, 'libraries': [] }
          endif
 
          let l:sLastFoundPath = l:myMatch[2]
