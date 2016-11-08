@@ -1667,7 +1667,7 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
                   if (index(l:dResult[l:sCurProjName].libraries, l:sLibName) == -1)
                      call add(l:dResult[l:sCurProjName].libraries, l:sLibName)
                   else
-                     call confirm('Indexer warning: duplicate library option in '.a:indexerFile.': '.l:sLibName)
+                     call confirm("Indexer warning:\nDuplicate library option \"".l:sLibName."\" in [".l:sCurProjName."] ")
                   endif
                else
                   if l:boolInProjectsParentSection
