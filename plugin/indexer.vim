@@ -169,21 +169,19 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
    endif
 
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
-      exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
+      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
+      exec "set tags+=". l:dProjects[ l:lFileProjs.name ]["tagsFilenameEscaped"]
 
       " Add library project tags, if any.
-      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
       for l:sProjectName in keys(l:dProjects)
-
          let l:dProjectLibraries = l:dProjects[l:sProjectName].libraries
          for l:sLibProjName in l:dProjectLibraries
             exec "set tags+=". l:dProjects[ l:sLibProjName ]["tagsFilenameEscaped"]
          endfor
-
       endfor
 
       if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
-         exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
+         exec "set path+=".l:dProjects[ l:lFileProjs.name ]["sPathsAll"]
       endif
    endfor
 endfunction
@@ -1584,7 +1582,6 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
-   "let l:i = 0
 
    for l:sLine in l:aLines
 
@@ -2101,7 +2098,6 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
    "     boolIndexed = 0
    "     tagsFilename - tags filename
    for l:sCurProjName in keys(s:dProjFilesParsed[ a:sProjFileKey ]["projects"])
-      let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
       let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
 
       "let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
