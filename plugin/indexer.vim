@@ -1537,6 +1537,93 @@ function! <SID>CheckLibraries(sProjectName, dProject)
 
 endfunction
 
+function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProjectNames)
+   let l:aLines = a:aLines
+   let l:sPattern_include = '\v^\s*include\s*(.*)'
+   let l:aIncludedFiles = a:aIncludedFiles
+   let l:aProjectNames = a:aProjectNames
+
+   let l:aNewLines = []
+
+   for l:sLine in l:aLines
+      " If line is not empty
+      if l:sLine !~ '^\s*$' && l:sLine !~ '^\s*\#.*$'
+         " Look for project name [PrjName]
+         let l:sProjectNameMatch = matchlist(l:sLine, '\v^\s*\[(.+)\]')
+
+         " Match "include" line
+         let l:includeMatch = matchlist(l:sLine, l:sPattern_include)
+         if (len(l:includeMatch) > 1)
+            let l:sIncludeFile = dfrank#util#ParsePath(dfrank#util#Trim(l:includeMatch[1]))
+
+            " Handle relative include file
+            if (!dfrank#util#IsAbsolutePath(l:sIncludeFile))
+               let l:sIndexerDir = fnamemodify(a:indexerFile, ":p:h")
+               let l:sIncludeFile = simplify(l:sIndexerDir . "/" . l:sIncludeFile)
+            endif
+
+            " Check for duplicate include files (loops)
+            if (index(l:aIncludedFiles, l:sIncludeFile) == -1)
+               " Make sure it's a file and readable.
+               if (!isdirectory(l:sIncludeFile) && filereadable(l:sIncludeFile))
+                  " Add include file to list
+                  call add(l:aIncludedFiles, l:sIncludeFile)
+
+                  " Preprocess include file
+                  let l:aIncLines = readfile(l:sIncludeFile)
+                  let l:aIncLines = <SID>PreProcessIndexFile(l:aIncLines, l:sIncludeFile, l:aIncludedFiles, l:aProjectNames)
+
+                  " Add processed lines to the "new" indexer file
+                  let l:aNewLines = extend(l:aNewLines, l:aIncLines)
+               else
+                  call confirm("Indexer warning:\nInvalid include file \"".l:includeMatch[1]."\"")
+               endif
+            else
+               call confirm("Indexer warning:\nInclude file loop found \"".l:sIncludeFile."\" in \"".a:indexerFile."\"")
+            endif
+         elseif (len(l:sProjectNameMatch) > 0)
+            " Check for duplicate project names
+
+            let l:sProjectName = l:sProjectNameMatch[1]
+
+            " Check if project name is like %blabla%
+            let l:sProjectNameMatch = '\v\%([^%]+)\%'
+
+            while (match(l:sProjectName, l:sProjectNameMatch) >= 0)
+               let l:tmpVarMatch = matchlist(l:sProjectName, l:sProjectNameMatch)
+               let l:dirNameMatch = matchlist(l:tmpVarMatch[1], '\vdir_name\(([^)]+)\)')
+
+               if (len(l:dirNameMatch) > 0)
+                  let l:sDirName = simplify(fnamemodify(a:indexerFile, ":p:h").'/'.l:dirNameMatch[1])
+                  let l:sDirName = fnamemodify(l:sDirName, ":t")
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, l:sDirName, '')
+               else
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, '_unknown_var_', '')
+               endif
+            endwhile
+
+            if (index(l:aProjectNames, l:sProjectName) == -1)
+               " Add project name to list
+               call add(l:aProjectNames, l:sProjectName)
+            else
+               call confirm("Indexer warning:\nDuplicate project found [".l:sProjectName."]")
+            endif
+
+            " Add project name [...] line to the "new" indexer file
+            call add(l:aNewLines, l:sLine)
+         else
+            " Pass through all other lines normally
+            call add(l:aNewLines, l:sLine)
+         endif
+      else
+         " Add empty lines
+         call add(l:aNewLines, l:sLine)
+      endif
+   endfor
+
+   return l:aNewLines
+endfunction
+
 " returns dictionary:
 " dResult[<project_1_name>] [files]
 "                           [wildcards]
@@ -1582,6 +1669,9 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
+
+   let l:aLines = <SID>PreProcessIndexFile(l:aLines, a:indexerFile, [], [])
+
 
    for l:sLine in l:aLines
 
