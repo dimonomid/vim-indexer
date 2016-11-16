@@ -793,6 +793,16 @@ function! <SID>_AddToDebugLog(iLevel, sType, dData)
 
 endfunction
 
+function! <SID>_CheckDebugLogLevel(iLevel)
+
+   if s:indexer_debugLogLevel >= a:iLevel
+      return 1
+   else
+      return 0
+   endif
+
+endfunction
+
 function! <SID>_EchoLogItem(dLogItem)
    if exists("*strftime")
       echo '* '.a:dLogItem["level"].' -------------------- '.strftime("%c").' --------------------*'
@@ -1545,6 +1555,10 @@ function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProject
 
    let l:aNewLines = []
 
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call add(l:aNewLines, "# [DEBUG] start { \"".a:indexerFile."\"")
+   endif
+
    for l:sLine in l:aLines
       " If line is not empty
       if l:sLine !~ '^\s*$' && l:sLine !~ '^\s*\#.*$'
@@ -1577,9 +1591,19 @@ function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProject
                   let l:aNewLines = extend(l:aNewLines, l:aIncLines)
                else
                   call confirm("Indexer warning:\nInvalid include file \"".l:includeMatch[1]."\"")
+
+                  if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                     let l:sWarning = "# [WARNING] Invalid include file \"".l:includeMatch[1]."\""
+                     call add(l:aNewLines, l:sWarning)
+                  endif
                endif
             else
                call confirm("Indexer warning:\nInclude file loop found \"".l:sIncludeFile."\" in \"".a:indexerFile."\"")
+
+               if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                  let l:sWarning = "# [WARNING] Include file loop found \"".l:sIncludeFile."\""
+                  call add(l:aNewLines, l:sWarning)
+               endif
             endif
          elseif (len(l:sProjectNameMatch) > 0)
             " Check for duplicate project names
@@ -1607,6 +1631,11 @@ function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProject
                call add(l:aProjectNames, l:sProjectName)
             else
                call confirm("Indexer warning:\nDuplicate project found [".l:sProjectName."]")
+
+               if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                  let l:sWarning = "# [WARNING] Duplicate project found [".l:sProjectName."]"
+                  call add(l:aNewLines, l:sWarning)
+               endif
             endif
 
             " Add project name [...] line to the "new" indexer file
@@ -1620,6 +1649,10 @@ function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProject
          call add(l:aNewLines, l:sLine)
       endif
    endfor
+
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call add(l:aNewLines, "# [DEBUG] end } \"".a:indexerFile."\"")
+   endif
 
    return l:aNewLines
 endfunction
@@ -1670,8 +1703,14 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
 
+   " Preprocess file first
    let l:aLines = <SID>PreProcessIndexFile(l:aLines, a:indexerFile, [], [])
 
+   " Write result of the preprocessing step next to the original indexer file
+   " for debugging.
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call writefile(l:aLines, a:indexerFile.'.preprocessed')
+   endif
 
    for l:sLine in l:aLines
 
