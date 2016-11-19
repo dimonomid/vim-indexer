@@ -169,21 +169,19 @@ function! <SID>SetTagsAndPath(iFileNum, sVimprjKey)
    endif
 
    for l:lFileProjs in g:vimprj#dFiles[ a:iFileNum ]["projects"]
-      exec "set tags+=". s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["tagsFilenameEscaped"]
+      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
+      exec "set tags+=". l:dProjects[ l:lFileProjs.name ]["tagsFilenameEscaped"]
 
       " Add library project tags, if any.
-      let l:dProjects = s:dProjFilesParsed[ l:lFileProjs.file ].projects
       for l:sProjectName in keys(l:dProjects)
-
          let l:dProjectLibraries = l:dProjects[l:sProjectName].libraries
          for l:sLibProjName in l:dProjectLibraries
             exec "set tags+=". l:dProjects[ l:sLibProjName ]["tagsFilenameEscaped"]
          endfor
-
       endfor
 
       if g:vimprj#dRoots[ a:sVimprjKey ]['indexer']["handlePath"]
-         exec "set path+=".s:dProjFilesParsed[ l:lFileProjs.file ]["projects"][ l:lFileProjs.name ]["sPathsAll"]
+         exec "set path+=".l:dProjects[ l:lFileProjs.name ]["sPathsAll"]
       endif
    endfor
 endfunction
@@ -791,6 +789,16 @@ function! <SID>_AddToDebugLog(iLevel, sType, dData)
       if !empty(s:indexer_debugLogFilename)
          exec ':redir >> '.s:indexer_debugLogFilename.' | silent call <SID>_EchoLogItem(l:dLogItem) | redir END'
       endif
+   endif
+
+endfunction
+
+function! <SID>_CheckDebugLogLevel(iLevel)
+
+   if s:indexer_debugLogLevel >= a:iLevel
+      return 1
+   else
+      return 0
    endif
 
 endfunction
@@ -1539,6 +1547,116 @@ function! <SID>CheckLibraries(sProjectName, dProject)
 
 endfunction
 
+function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProjectNames)
+   let l:aLines = a:aLines
+   let l:sPattern_include = '\v^\s*include\s*(.*)'
+   let l:aIncludedFiles = a:aIncludedFiles
+   let l:aProjectNames = a:aProjectNames
+
+   let l:aNewLines = []
+
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call add(l:aNewLines, "# [DEBUG] start { \"".a:indexerFile."\"")
+   endif
+
+   for l:sLine in l:aLines
+      " If line is not empty
+      if l:sLine !~ '^\s*$' && l:sLine !~ '^\s*\#.*$'
+         " Look for project name [PrjName]
+         let l:sProjectNameMatch = matchlist(l:sLine, '\v^\s*\[(.+)\]')
+
+         " Match "include" line
+         let l:includeMatch = matchlist(l:sLine, l:sPattern_include)
+         if (len(l:includeMatch) > 1)
+            let l:sIncludeFile = dfrank#util#ParsePath(dfrank#util#Trim(l:includeMatch[1]))
+
+            " Handle relative include file
+            if (!dfrank#util#IsAbsolutePath(l:sIncludeFile))
+               let l:sIndexerDir = fnamemodify(a:indexerFile, ":p:h")
+               let l:sIncludeFile = simplify(l:sIndexerDir . "/" . l:sIncludeFile)
+            endif
+
+            " Check for duplicate include files (loops)
+            if (index(l:aIncludedFiles, l:sIncludeFile) == -1)
+               " Make sure it's a file and readable.
+               if (!isdirectory(l:sIncludeFile) && filereadable(l:sIncludeFile))
+                  " Add include file to list
+                  call add(l:aIncludedFiles, l:sIncludeFile)
+
+                  " Preprocess include file
+                  let l:aIncLines = readfile(l:sIncludeFile)
+                  let l:aIncLines = <SID>PreProcessIndexFile(l:aIncLines, l:sIncludeFile, l:aIncludedFiles, l:aProjectNames)
+
+                  " Add processed lines to the "new" indexer file
+                  let l:aNewLines = extend(l:aNewLines, l:aIncLines)
+               else
+                  call confirm("Indexer warning:\nInvalid include file \"".l:includeMatch[1]."\"")
+
+                  if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                     let l:sWarning = "# [WARNING] Invalid include file \"".l:includeMatch[1]."\""
+                     call add(l:aNewLines, l:sWarning)
+                  endif
+               endif
+            else
+               call confirm("Indexer warning:\nInclude file loop found \"".l:sIncludeFile."\" in \"".a:indexerFile."\"")
+
+               if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                  let l:sWarning = "# [WARNING] Include file loop found \"".l:sIncludeFile."\""
+                  call add(l:aNewLines, l:sWarning)
+               endif
+            endif
+         elseif (len(l:sProjectNameMatch) > 0)
+            " Check for duplicate project names
+
+            let l:sProjectName = l:sProjectNameMatch[1]
+
+            " Check if project name is like %blabla%
+            let l:sProjectNameMatch = '\v\%([^%]+)\%'
+
+            while (match(l:sProjectName, l:sProjectNameMatch) >= 0)
+               let l:tmpVarMatch = matchlist(l:sProjectName, l:sProjectNameMatch)
+               let l:dirNameMatch = matchlist(l:tmpVarMatch[1], '\vdir_name\(([^)]+)\)')
+
+               if (len(l:dirNameMatch) > 0)
+                  let l:sDirName = simplify(fnamemodify(a:indexerFile, ":p:h").'/'.l:dirNameMatch[1])
+                  let l:sDirName = fnamemodify(l:sDirName, ":t")
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, l:sDirName, '')
+               else
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, '_unknown_var_', '')
+               endif
+            endwhile
+
+            if (index(l:aProjectNames, l:sProjectName) == -1)
+               " Add project name to list
+               call add(l:aProjectNames, l:sProjectName)
+            else
+               call confirm("Indexer warning:\nDuplicate project found [".l:sProjectName."]")
+
+               if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+                  let l:sWarning = "# [WARNING] Duplicate project found [".l:sProjectName."]"
+                  call add(l:aNewLines, l:sWarning)
+               endif
+            endif
+
+            " Add project name [...] line to the "new" indexer file
+            call add(l:aNewLines, l:sLine)
+         else
+            " Pass through all other lines normally
+            call add(l:aNewLines, l:sLine)
+         endif
+      else
+         " Add empty lines
+         call add(l:aNewLines, l:sLine)
+      endif
+   endfor
+
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call add(l:aNewLines, "# [DEBUG] end } \"".a:indexerFile."\"")
+   endif
+
+   return l:aNewLines
+endfunction
+
 " returns dictionary:
 " dResult[<project_1_name>] [files]
 "                           [wildcards]
@@ -1584,7 +1702,15 @@ function! <SID>GetDirsAndFilesFromIndexerList(aLines, indexerFile, dExistsResult
 
    let l:sCurProjName = ''
    let l:sPattern_option = '\v^\s*option\:([a-zA-Z0-9_\-]+)\s*\=\s*\"(.*)\"'
-   "let l:i = 0
+
+   " Preprocess file first
+   let l:aLines = <SID>PreProcessIndexFile(l:aLines, a:indexerFile, [], [])
+
+   " Write result of the preprocessing step next to the original indexer file
+   " for debugging.
+   if <SID>_CheckDebugLogLevel(s:DEB_LEVEL__PARSE)
+      call writefile(l:aLines, a:indexerFile.'.preprocessed')
+   endif
 
    for l:sLine in l:aLines
 
@@ -2101,7 +2227,6 @@ function! <SID>ParseProjectSettingsFile(sProjFileKey)
    "     boolIndexed = 0
    "     tagsFilename - tags filename
    for l:sCurProjName in keys(s:dProjFilesParsed[ a:sProjFileKey ]["projects"])
-      let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
       let l:dCurProject = s:dProjFilesParsed[a:sProjFileKey]["projects"][ l:sCurProjName ]
 
       "let l:sTagsFileWOPath = dfrank#util#GetKeyFromPath(a:sProjFileKey.'_'.l:sCurProjName)
