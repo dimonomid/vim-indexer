@@ -510,6 +510,20 @@ function! g:vimprj#dHooks['OnFileOpen']['indexer'](dParams)
 
             let l:dProject = l:dProjects[l:sProjectName]
             for l:sLibProjName in l:dProject.libraries
+               if has_key(l:dProjects[ l:sLibProjName ]['options'], 'dontUpdateTagsIfFileExists')
+                  let l:sDontUpdateTagsIfFileExists = l:dProjects[ l:sLibProjName ]['options'].dontUpdateTagsIfFileExists
+
+                  if (l:sDontUpdateTagsIfFileExists  == '1')
+                     let l:sTagsFile = l:dProjects[ l:sLibProjName ].tagsFilename
+
+                     if (filereadable(l:sTagsFile))
+                        let l:dProjects[ l:sLibProjName ].boolIndexed = 1
+                     endif
+                  elseif (l:sDontUpdateTagsIfFileExists != '0')
+                     call confirm ("Indexer warning:\nUnknown library dontUpdateTagsIfFileExists option: \"".l:sDontUpdateTagsIfFileExists."\"\nOnly \"0\" or \"1\" are supported.")
+                  endif
+               endif
+
                if (!l:dProjects[ l:sLibProjName ].boolIndexed)
                   call <SID>UpdateTagsForProject(l:sProjFileKey, l:sLibProjName, "", a:dParams['dVimprjRootParams'])
                endif
