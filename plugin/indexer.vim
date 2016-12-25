@@ -1625,18 +1625,18 @@ function! <SID>PreProcessIndexFile(aLines, indexerFile, aIncludedFiles, aProject
             let l:sProjectName = l:sProjectNameMatch[1]
 
             " Check if project name is like %blabla%
-            let l:sProjectNameMatch = '\v\%([^%]+)\%'
+            let l:sProjectNameRegexp = '\v\%([^%]+)\%'
 
-            while (match(l:sProjectName, l:sProjectNameMatch) >= 0)
-               let l:tmpVarMatch = matchlist(l:sProjectName, l:sProjectNameMatch)
+            while (match(l:sProjectName, l:sProjectNameRegexp) >= 0)
+               let l:tmpVarMatch = matchlist(l:sProjectName, l:sProjectNameRegexp)
                let l:dirNameMatch = matchlist(l:tmpVarMatch[1], '\vdir_name\(([^)]+)\)')
 
                if (len(l:dirNameMatch) > 0)
                   let l:sDirName = simplify(fnamemodify(a:indexerFile, ":p:h").'/'.l:dirNameMatch[1])
                   let l:sDirName = fnamemodify(l:sDirName, ":t")
-                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, l:sDirName, '')
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameRegexp, l:sDirName, '')
                else
-                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameMatch, '_unknown_var_', '')
+                  let l:sProjectName = substitute(l:sProjectName, l:sProjectNameRegexp, '_unknown_var_', '')
                endif
             endwhile
 
