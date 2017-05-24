@@ -632,6 +632,36 @@ endfunction
 "                                   ASYNC COMMAND FUNCTIONS
 " ************************************************************************************************
 
+let s:indexer_hasJobSupport = 0
+
+if ( (v:version >= 800) && has('job') && has('channel') )
+
+let s:indexer_hasJobSupport = 1
+
+" Vim 8 job
+function! <SID>IndexerAsync_Impl(tool_cmd, temp_file)
+
+   if has('win32') && &shell =~ 'cmd'
+      let l:cmd = [ a:tool_cmd ]
+   else
+      let l:cmd = [&shell, &shellcmdflag, a:tool_cmd]
+   endif
+
+   let l:cb_args = { 'temp_file': a:temp_file }
+
+   call job_start(l:cmd, {
+      \ 'in_io':    'null',
+      \ 'err_io':   'out',
+      \ 'out_io':   'file', 'out_name': a:temp_file,
+      \ 'exit_cb': function('<SID>Indexer_OnAsyncJobComplete', l:cb_args),
+      \ })
+
+   let s:sLastOSCmd = join(l:cmd, " ")
+
+endfunction
+
+else     " Original background task handling
+
 " ------------------ next 2 functions is directly from asynccommand.vim ---------------------
 
 " Basic background task running is different on each platform
@@ -650,9 +680,8 @@ if has("win32") || has("win64")
       silent exec l:sFullCmd
    endfunction
 else
-   " Works in linux (Ubuntu 10.04)
+   " Works in Linux (Ubuntu 10.04)
    function! <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
-
       let l:cmd = a:tool_cmd
 
       if !empty(a:vim_cmd)
@@ -666,6 +695,8 @@ else
    endfunction
 endif
 
+endif
+
 function! <SID>IndexerAsyncCommand(command, vim_func)
 
    " async works if only v:servername is not empty!
@@ -673,35 +704,42 @@ function! <SID>IndexerAsyncCommand(command, vim_func)
 
    if <SID>_IsBackgroundEnabled()
 
-      " String together and execute.
       let temp_file = tempname()
 
-      " Grab output and error in case there's something we should see
-      let tool_cmd = a:command . printf(&shellredir, temp_file)
+      if !empty(s:indexer_hasJobSupport)
 
-      let vim_cmd = ""
-      if !empty(a:vim_func)
+         call <SID>IndexerAsync_Impl(a:command, temp_file)
 
-         if g:indexer_vimExecutable == '*auto*'
-            if has('mac')
-               let sVimExecutable = 'mvim'
+      else
+         " String together and execute.
+
+         " Grab output and error in case there's something we should see
+         let tool_cmd = a:command . printf(&shellredir, temp_file)
+
+         let vim_cmd = ""
+         if !empty(a:vim_func)
+
+            if g:indexer_vimExecutable == '*auto*'
+               if has('mac')
+                   let sVimExecutable = 'mvim'
+               else
+                   let sVimExecutable = 'vim'
+               endif
             else
-               let sVimExecutable = 'vim'
+               let sVimExecutable = g:indexer_vimExecutable
             endif
-         else
-            let sVimExecutable = g:indexer_vimExecutable
+
+            let vim_cmd = sVimExecutable." --servername ".v:servername." --remote-expr \"" . a:vim_func . "('" . temp_file . "')\" "
          endif
 
-         let vim_cmd = sVimExecutable." --servername ".v:servername." --remote-expr \"" . a:vim_func . "('" . temp_file . "')\" "
-      endif
+         call <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
 
-      call <SID>IndexerAsync_Impl(tool_cmd, vim_cmd)
+      endif
    else
       " v:servername is empty! (or g:indexer_backgroundDisabled is not empty)
       " so, no async is present.
       let l:sCmdOutput = system(a:command)
       call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
-
    endif
 
 endfunction
@@ -771,10 +809,20 @@ function! <SID>_AsyncDummyComplete()
    call <SID>Indexer_ParseCommandOutput("dummy")
 endfunction
 
-function! Indexer_OnAsyncCommandComplete(temp_file_name)
+" Vim 8 job completion
+function! <SID>Indexer_OnAsyncJobComplete(job, status) dict
+   let l:temp_file = self.temp_file
+   call Indexer_OnAsyncCommandComplete(l:temp_file)
+endfunction
 
+function! Indexer_OnAsyncCommandComplete(temp_file)
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ASYNC, 'asyncCmdComplete', {'temp file' : a:temp_file})
 
-   let l:lCmdOutput = readfile(a:temp_file_name)
+   let l:lCmdOutput = []
+   if filereadable(a:temp_file)
+      let l:lCmdOutput = readfile(a:temp_file)
+   endif
+
    let l:sCmdOutput = join(l:lCmdOutput, "\n")
 
    call <SID>Indexer_ParseCommandOutput(l:sCmdOutput)
@@ -912,17 +960,23 @@ function! <SID>_UseDirsInsteadOfFiles(dVimprjRoot)
 endfunction
 
 function! <SID>_IsBackgroundEnabled()
-   return (!empty(v:servername) && empty(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].backgroundDisabled))
+   if empty(s:indexer_hasJobSupport)
+      return (!empty(v:servername) && empty(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].backgroundDisabled))
+   else
+      return empty(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].backgroundDisabled)
+   endif
 endfunction
 
 function! <SID>_GetBackgroundComment()
    let l:sComment = ""
 
-   if empty(v:servername)
-      if !empty(l:sComment)
-         let l:sComment .= ", "
+   if empty(s:indexer_hasJobSupport)
+      if empty(v:servername)
+         if !empty(l:sComment)
+            let l:sComment .= ", "
+         endif
+         let l:sComment .= "because of v:servername is empty (:help servername)"
       endif
-      let l:sComment .= "because of v:servername is empty (:help servername)"
    endif
 
    if !empty(g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ]['indexer'].backgroundDisabled)
@@ -1098,7 +1152,11 @@ function! <SID>IndexerInfo()
                \     : 'do nothing'
                \ )
       if <SID>_IsBackgroundEnabled()
-         echo '* Background tags generation: YES'
+         if empty(s:indexer_hasJobSupport)
+            echo '* Background tags generation: YES'
+         else
+            echo '* Background tags generation: YES (job)'
+         endif
       else
          echo '* Background tags generation: NO. '.<SID>_GetBackgroundComment()
       endif
